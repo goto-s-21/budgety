@@ -1,13 +1,10 @@
-import { GmailConnectionCard } from '../features/gmail/GmailConnectionCard'
-
 interface Props {
-  userId: string
   userEmail: string | undefined
   onSignOut: () => void
   onOpenImport: () => void
 }
 
-export default function More({ userId, userEmail, onSignOut, onOpenImport }: Props) {
+export default function More({ userEmail, onSignOut, onOpenImport }: Props) {
   return (
     <>
       <div className="section-head">
@@ -32,8 +29,6 @@ export default function More({ userId, userEmail, onSignOut, onOpenImport }: Pro
           </div>
           <span>›</span>
         </button>
-
-        <GmailConnectionCard userId={userId} />
       </section>
 
 

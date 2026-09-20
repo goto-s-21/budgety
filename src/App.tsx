@@ -12,11 +12,10 @@ import Analysis from './pages/Analysis'
 import History from './pages/History'
 import More from './pages/More'
 import Import from './pages/Import'
-import { GmailCallback } from './features/gmail/GmailCallback'
 import './styles/theme.css'
 
 
-type PageName = ViewName | 'import' | 'gmail-callback'
+type PageName = ViewName | 'import'
 
 
 export default function App() {
@@ -29,15 +28,6 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const initialized = useRef(false)
-
-  // Googleの同意画面から /auth/gmail/callback?code=... に戻ってきた場合、
-  // 起動時のURLパスを見てgmail-callback画面を表示する。
-  // (React Routerは使わず、App.tsx既存のpage state方式に合わせている)
-  useEffect(() => {
-    if (window.location.pathname === '/auth/gmail/callback') {
-      setPage('gmail-callback')
-    }
-  }, [])
 
 
   useEffect(() => {
@@ -154,8 +144,6 @@ export default function App() {
 
 
   if (!session) {
-    // Gmailコールバック待ちの場合でも未ログインなら通常のログイン画面を出す
-    // (Gmail連携はログイン後にのみ許可するため、未ログイン状態でcodeが来ることは想定しない)
     return (
       <div className="login-screen">
         <div className="brand"><span>♥</span>Budgety</div>
@@ -166,15 +154,6 @@ export default function App() {
           Googleでログイン
         </button>
       </div>
-    )
-  }
-
-  if (page === 'gmail-callback') {
-    return (
-      <GmailCallback
-        userId={session.user.id}
-        onDone={() => setPage('more')}
-      />
     )
   }
 
@@ -200,7 +179,6 @@ export default function App() {
       )}
       {page === 'more' && (
         <More
-          userId={session.user.id}
           userEmail={session.user.email}
           onSignOut={signOut}
           onOpenImport={() => setPage('import')}
