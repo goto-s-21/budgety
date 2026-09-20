@@ -2,10 +2,11 @@ import { useEffect, useState, useRef } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { ensureDefaultCategories, fetchCategories } from './lib/categories'
-import { addTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
+import { addTransaction, updateTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
 import BottomNav from './components/BottomNav'
 import type { ViewName } from './components/BottomNav'
 import AddSheet from './components/AddSheet'
+import type { EditableTransaction } from './components/AddSheet'
 import Home from './pages/Home'
 import Analysis from './pages/Analysis'
 import History from './pages/History'
@@ -17,6 +18,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<ViewName>('home')
   const [addOpen, setAddOpen] = useState(false)
+  const [editingTx, setEditingTx] = useState<EditableTransaction | null>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const initialized = useRef(false)
@@ -68,7 +70,30 @@ export default function App() {
     await supabase.auth.signOut()
   }
 
-  async function handleAddTransaction(input: {
+  function openAddNew() {
+    setEditingTx(null)
+    setAddOpen(true)
+  }
+
+  function openEdit(tx: any) {
+    setEditingTx({
+      id: tx.id,
+      type: tx.type,
+      amount: tx.amount,
+      merchantName: tx.merchants?.canonical_name || '',
+      categoryId: tx.category_id || '',
+      date: tx.date,
+      memo: tx.memo,
+    })
+    setAddOpen(true)
+  }
+
+  function closeSheet() {
+    setAddOpen(false)
+    setEditingTx(null)
+  }
+
+  async function handleSubmit(input: {
     type: 'expense' | 'income'
     amount: number
     merchantName: string
@@ -77,7 +102,11 @@ export default function App() {
     memo?: string
   }) {
     if (!session) return
-    await addTransaction({ userId: session.user.id, ...input })
+    if (editingTx) {
+      await updateTransaction({ id: editingTx.id, userId: session.user.id, ...input })
+    } else {
+      await addTransaction({ userId: session.user.id, ...input })
+    }
     await refreshTransactions()
   }
 
@@ -118,21 +147,19 @@ export default function App() {
       )}
       {view === 'analysis' && <Analysis transactions={transactions} />}
       {view === 'history' && (
-        <History
-          transactions={transactions}
-          onDelete={handleDeleteTransaction}
-          onAdd={() => setAddOpen(true)}
-        />
+        <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />
       )}
       {view === 'more' && <More userEmail={session.user.email} onSignOut={signOut} />}
 
-      <BottomNav active={view} onChange={setView} onAdd={() => setAddOpen(true)} />
+      <BottomNav active={view} onChange={setView} onAdd={openAddNew} />
 
       <AddSheet
         open={addOpen}
         categories={categories}
-        onClose={() => setAddOpen(false)}
-        onSubmit={handleAddTransaction}
+        editing={editingTx}
+        onClose={closeSheet}
+        onSubmit={handleSubmit}
+        onDelete={handleDeleteTransaction}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 
 export interface CategoryOption {
@@ -7,9 +7,20 @@ export interface CategoryOption {
   icon: string | null
 }
 
+export interface EditableTransaction {
+  id: string
+  type: 'expense' | 'income'
+  amount: number
+  merchantName: string
+  categoryId: string
+  date: string
+  memo?: string | null
+}
+
 interface Props {
   open: boolean
   categories: CategoryOption[]
+  editing?: EditableTransaction | null
   onClose: () => void
   onSubmit: (input: {
     type: 'expense' | 'income'
@@ -19,36 +30,66 @@ interface Props {
     date: string
     memo?: string
   }) => Promise<void>
+  onDelete?: (id: string) => Promise<void>
 }
 
-export default function AddSheet({ open, categories, onClose, onSubmit }: Props) {
-  const [type, setType] = useState<'expense' | 'income'>('expense')
-  const [amount, setAmount] = useState('')
-  const [merchant, setMerchant] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [memo, setMemo] = useState('')
+const emptyForm = {
+  type: 'expense' as 'expense' | 'income',
+  amount: '',
+  merchant: '',
+  categoryId: '',
+  date: new Date().toISOString().slice(0, 10),
+  memo: '',
+}
+
+export default function AddSheet({ open, categories, editing, onClose, onSubmit, onDelete }: Props) {
+  const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const isEditing = Boolean(editing)
+
+  useEffect(() => {
+    if (open && editing) {
+      setForm({
+        type: editing.type,
+        amount: String(editing.amount),
+        merchant: editing.merchantName,
+        categoryId: editing.categoryId,
+        date: editing.date,
+        memo: editing.memo || '',
+      })
+    } else if (open && !editing) {
+      setForm(emptyForm)
+    }
+  }, [open, editing])
 
   if (!open) return null
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!categoryId) return
+    if (!form.categoryId) return
     setSaving(true)
     try {
       await onSubmit({
-        type,
-        amount: Number(amount),
-        merchantName: merchant,
-        categoryId,
-        date,
-        memo: memo || undefined,
+        type: form.type,
+        amount: Number(form.amount),
+        merchantName: form.merchant,
+        categoryId: form.categoryId,
+        date: form.date,
+        memo: form.memo || undefined,
       })
-      setAmount('')
-      setMerchant('')
-      setMemo('')
-      setCategoryId('')
+      setForm(emptyForm)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!editing || !onDelete) return
+    if (!confirm('この記録を削除しますか？')) return
+    setSaving(true)
+    try {
+      await onDelete(editing.id)
       onClose()
     } finally {
       setSaving(false)
@@ -59,22 +100,22 @@ export default function AddSheet({ open, categories, onClose, onSubmit }: Props)
     <div className="modal open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <div className="sheet-head">
-          <h2>記録を追加</h2>
+          <h2>{isEditing ? '記録を編集' : '記録を追加'}</h2>
           <button className="close" onClick={onClose} type="button">×</button>
         </div>
 
         <div className="type-switch">
           <button
             type="button"
-            className={type === 'expense' ? 'selected' : ''}
-            onClick={() => setType('expense')}
+            className={form.type === 'expense' ? 'selected' : ''}
+            onClick={() => setForm((f) => ({ ...f, type: 'expense' }))}
           >
             支出
           </button>
           <button
             type="button"
-            className={type === 'income' ? 'selected' : ''}
-            onClick={() => setType('income')}
+            className={form.type === 'income' ? 'selected' : ''}
+            onClick={() => setForm((f) => ({ ...f, type: 'income' }))}
           >
             収入
           </button>
@@ -87,23 +128,23 @@ export default function AddSheet({ open, categories, onClose, onSubmit }: Props)
             min={1}
             required
             placeholder="例：850"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            value={form.amount}
+            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
           />
 
-          <label>{type === 'expense' ? '利用先' : '収入元'}</label>
+          <label>{form.type === 'expense' ? '利用先' : '収入元'}</label>
           <input
             required
-            placeholder={type === 'expense' ? '例：セブンイレブン' : '例：アルバイト'}
-            value={merchant}
-            onChange={(e) => setMerchant(e.target.value)}
+            placeholder={form.type === 'expense' ? '例：セブンイレブン' : '例：アルバイト'}
+            value={form.merchant}
+            onChange={(e) => setForm((f) => ({ ...f, merchant: e.target.value }))}
           />
 
           <label>カテゴリー</label>
           <select
             required
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            value={form.categoryId}
+            onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
           >
             <option value="">選択してください</option>
             {categories.map((c) => (
@@ -117,20 +158,32 @@ export default function AddSheet({ open, categories, onClose, onSubmit }: Props)
           <input
             type="date"
             required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={form.date}
+            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
           />
 
           <label>メモ</label>
           <input
             placeholder="任意"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
+            value={form.memo}
+            onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
           />
 
           <button className="primary" type="submit" disabled={saving}>
-            {saving ? '保存中...' : '保存する'}
+            {saving ? '保存中...' : isEditing ? '更新する' : '保存する'}
           </button>
+
+          {isEditing && onDelete && (
+            <button
+              className="secondary"
+              type="button"
+              onClick={handleDelete}
+              disabled={saving}
+              style={{ color: 'var(--primary)' }}
+            >
+              この記録を削除する
+            </button>
+          )}
         </form>
       </div>
     </div>

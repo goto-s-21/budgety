@@ -13,12 +13,14 @@ export interface AddTransactionInput {
 
 export interface UpdateTransactionInput {
   id: string
-  amount?: number
-  merchantName?: string
-  categoryId?: string
-  date?: string
-  time?: string | null
-  memo?: string | null
+  userId: string
+  type: 'expense' | 'income'
+  amount: number
+  merchantName: string
+  categoryId: string
+  date: string
+  time?: string
+  memo?: string
 }
 
 async function resolveMerchantId(userId: string, merchantName: string) {
@@ -66,14 +68,22 @@ export async function addTransaction(input: AddTransactionInput) {
 }
 
 export async function updateTransaction(input: UpdateTransactionInput) {
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.amount !== undefined) patch.amount = input.amount
-  if (input.categoryId !== undefined) patch.category_id = input.categoryId
-  if (input.date !== undefined) patch.date = input.date
-  if (input.time !== undefined) patch.time = input.time
-  if (input.memo !== undefined) patch.memo = input.memo
+  const merchantId = await resolveMerchantId(input.userId, input.merchantName)
 
-  const { error } = await supabase.from('transactions').update(patch).eq('id', input.id)
+  const { error } = await supabase
+    .from('transactions')
+    .update({
+      date: input.date,
+      time: input.time || null,
+      amount: input.amount,
+      type: input.type,
+      merchant_id: merchantId,
+      category_id: input.categoryId,
+      memo: input.memo || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.id)
+
   if (error) throw error
 }
 

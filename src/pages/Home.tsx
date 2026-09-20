@@ -1,4 +1,5 @@
 import { yen, monthKey, thisMonth } from '../lib/formatters'
+import { CategoryIcon } from '../components/Icons'
 
 interface TxRow {
   id: string
@@ -60,7 +61,9 @@ export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Prop
         {catRows.length === 0 && <div className="empty">支出を追加すると表示されます。</div>}
         {catRows.slice(0, 5).map(([name, value]) => (
           <div className="spend-row" key={name}>
-            <div className="icon">🧾</div>
+            <div className="icon">
+              <CategoryIcon name={name} color="var(--primary)" />
+            </div>
             <div className="grow">
               <div className="name">{name}</div>
               <div className="bar">
@@ -80,7 +83,9 @@ export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Prop
         {recent.length === 0 && <div className="empty">まだ記録がありません。</div>}
         {recent.map((t) => (
           <div className="tx" key={t.id}>
-            <div className="icon">{t.categories?.icon || '🧾'}</div>
+            <div className="icon">
+              <CategoryIcon name={t.categories?.name || '未分類'} color="var(--primary)" />
+            </div>
             <div className="grow">
               <div className="name">{t.merchants?.canonical_name || '未設定'}</div>
               <div className="sub">{t.categories?.name || '未分類'}</div>
