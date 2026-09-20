@@ -1,0 +1,139 @@
+import { useEffect, useState, useRef } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from './lib/supabase'
+import { ensureDefaultCategories, fetchCategories } from './lib/categories'
+import { addTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
+import BottomNav from './components/BottomNav'
+import type { ViewName } from './components/BottomNav'
+import AddSheet from './components/AddSheet'
+import Home from './pages/Home'
+import Analysis from './pages/Analysis'
+import History from './pages/History'
+import More from './pages/More'
+import './styles/theme.css'
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [view, setView] = useState<ViewName>('home')
+  const [addOpen, setAddOpen] = useState(false)
+  const [categories, setCategories] = useState<any[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
+  const initialized = useRef(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
+      if (data.session && !initialized.current) {
+        initialized.current = true
+        loadData(data.session.user.id)
+      }
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+      if (newSession && !initialized.current) {
+        initialized.current = true
+        loadData(newSession.user.id)
+      }
+      if (!newSession) {
+        initialized.current = false
+        setCategories([])
+        setTransactions([])
+      }
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  async function loadData(userId: string) {
+    await ensureDefaultCategories(userId)
+    const [cats, txs] = await Promise.all([fetchCategories(userId), fetchTransactions(userId)])
+    setCategories(cats || [])
+    setTransactions(txs || [])
+  }
+
+  async function refreshTransactions() {
+    if (!session) return
+    const txs = await fetchTransactions(session.user.id)
+    setTransactions(txs || [])
+  }
+
+  async function signInWithGoogle() {
+    await supabase.auth.signInWithOAuth({ provider: 'google' })
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut()
+  }
+
+  async function handleAddTransaction(input: {
+    type: 'expense' | 'income'
+    amount: number
+    merchantName: string
+    categoryId: string
+    date: string
+    memo?: string
+  }) {
+    if (!session) return
+    await addTransaction({ userId: session.user.id, ...input })
+    await refreshTransactions()
+  }
+
+  async function handleDeleteTransaction(id: string) {
+    await deleteTransaction(id)
+    await refreshTransactions()
+  }
+
+  if (loading) return null
+
+  if (!session) {
+    return (
+      <div className="login-screen">
+        <div className="brand"><span>♥</span>Budgety</div>
+        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+          支出をできるだけ自動で集める家計管理アプリ
+        </p>
+        <button className="google-btn" onClick={signInWithGoogle}>
+          Googleでログイン
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="app">
+      <header className="top">
+        <div className="brand"><span>♥</span>Budgety</div>
+        <div className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</div>
+      </header>
+
+      {view === 'home' && (
+        <Home
+          transactions={transactions}
+          onSeeAnalysis={() => setView('analysis')}
+          onSeeHistory={() => setView('history')}
+        />
+      )}
+      {view === 'analysis' && <Analysis transactions={transactions} />}
+      {view === 'history' && (
+        <History
+          transactions={transactions}
+          onDelete={handleDeleteTransaction}
+          onAdd={() => setAddOpen(true)}
+        />
+      )}
+      {view === 'more' && <More userEmail={session.user.email} onSignOut={signOut} />}
+
+      <BottomNav active={view} onChange={setView} onAdd={() => setAddOpen(true)} />
+
+      <AddSheet
+        open={addOpen}
+        categories={categories}
+        onClose={() => setAddOpen(false)}
+        onSubmit={handleAddTransaction}
+      />
+    </div>
+  )
+}
