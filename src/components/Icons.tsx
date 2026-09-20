@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react'
+import type { ReactElement, SVGProps } from 'react'
 
 function base(props: SVGProps<SVGSVGElement>) {
   return {
@@ -141,7 +141,7 @@ export const IconPencil = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
-const CATEGORY_ICON_MAP: Record<string, (p: SVGProps<SVGSVGElement>) => JSX.Element> = {
+const CATEGORY_ICON_MAP: Record<string, (p: SVGProps<SVGSVGElement>) => ReactElement> = {
   食費: IconFood,
   コンビニ: IconConvenience,
   外食: IconDining,
