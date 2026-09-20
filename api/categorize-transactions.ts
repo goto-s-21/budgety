@@ -1,12 +1,4 @@
-type VercelRequest = {
-  method?: string
-  body: unknown
-}
-
-type VercelResponse = {
-  status: (code: number) => VercelResponse
-  json: (body: unknown) => VercelResponse
-}
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CATEGORY_LIST = [
   '食費', 'コンビニ', '外食', '日用品', '美容',
@@ -52,7 +44,7 @@ ${items.map((i) => `${i.index}: ${i.merchant} / ${i.amount}円`).join('\n')}
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
