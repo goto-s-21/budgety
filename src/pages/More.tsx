@@ -1,9 +1,10 @@
 interface Props {
   userEmail: string | undefined
   onSignOut: () => void
+  onOpenImport: () => void
 }
 
-export default function More({ userEmail, onSignOut }: Props) {
+export default function More({ userEmail, onSignOut, onOpenImport }: Props) {
   return (
     <>
       <div className="section-head">
@@ -19,14 +20,14 @@ export default function More({ userEmail, onSignOut }: Props) {
           </div>
           <span>›</span>
         </div>
-        <div className="spend-row">
+        <button className="spend-row" style={{ width: '100%', textAlign: 'left', background: 'none' }} onClick={onOpenImport}>
           <div className="icon">📥</div>
           <div className="grow">
-            <div className="name">CSV / PDFインポート</div>
-            <div className="sub">次の実装フェーズで対応</div>
+            <div className="name">CSVインポート</div>
+            <div className="sub">過去データの取り込み</div>
           </div>
           <span>›</span>
-        </div>
+        </button>
         <div className="spend-row">
           <div className="icon">✉️</div>
           <div className="grow">

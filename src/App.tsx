@@ -11,12 +11,16 @@ import Home from './pages/Home'
 import Analysis from './pages/Analysis'
 import History from './pages/History'
 import More from './pages/More'
+import Import from './pages/Import'
 import './styles/theme.css'
+
+type PageName = ViewName | 'import'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<ViewName>('home')
+  const [page, setPage] = useState<PageName>('home')
   const [addOpen, setAddOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<EditableTransaction | null>(null)
   const [categories, setCategories] = useState<any[]>([])
@@ -68,6 +72,11 @@ export default function App() {
 
   async function signOut() {
     await supabase.auth.signOut()
+  }
+
+  function changeView(v: ViewName) {
+    setView(v)
+    setPage(v)
   }
 
   function openAddNew() {
@@ -138,20 +147,37 @@ export default function App() {
         <div className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</div>
       </header>
 
-      {view === 'home' && (
+      {page === 'home' && (
         <Home
           transactions={transactions}
-          onSeeAnalysis={() => setView('analysis')}
-          onSeeHistory={() => setView('history')}
+          onSeeAnalysis={() => changeView('analysis')}
+          onSeeHistory={() => changeView('history')}
         />
       )}
-      {view === 'analysis' && <Analysis transactions={transactions} />}
-      {view === 'history' && (
+      {page === 'analysis' && <Analysis transactions={transactions} />}
+      {page === 'history' && (
         <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />
       )}
-      {view === 'more' && <More userEmail={session.user.email} onSignOut={signOut} />}
+      {page === 'more' && (
+        <More
+          userEmail={session.user.email}
+          onSignOut={signOut}
+          onOpenImport={() => setPage('import')}
+        />
+      )}
+      {page === 'import' && (
+        <Import
+          userId={session.user.id}
+          categories={categories}
+          onDone={() => {
+            refreshTransactions()
+            changeView('history')
+          }}
+          onBack={() => setPage('more')}
+        />
+      )}
 
-      <BottomNav active={view} onChange={setView} onAdd={openAddNew} />
+      {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
 
       <AddSheet
         open={addOpen}
