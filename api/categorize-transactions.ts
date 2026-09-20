@@ -6,6 +6,33 @@ const CATEGORY_LIST = [
   '交際費', '趣味', '旅行', '学習', '家賃・住居', 'その他',
 ]
 
+async function callGeminiWithRetry(
+  url: string,
+  body: string,
+  maxRetries = 2
+): Promise<Response> {
+  let lastResponse: Response | null = null
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+
+    if (response.status !== 503) {
+      return response
+    }
+
+    lastResponse = response
+    if (attempt < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+    }
+  }
+
+  return lastResponse as Response
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -43,16 +70,12 @@ ${items.map((i) => `${i.index}: ${i.merchant} / ${i.amount}円`).join('\n')}
 [{"index":0,"category":"食費"},{"index":1,"category":"日用品"}]`
 
   try {
-    const response = await fetch(
+    const response = await callGeminiWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-        }),
-      }
+      JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+      })
     )
 
     if (!response.ok) {
