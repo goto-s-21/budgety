@@ -12,9 +12,12 @@ import Analysis from './pages/Analysis'
 import History from './pages/History'
 import More from './pages/More'
 import Import from './pages/Import'
+import { GmailCallback } from './features/gmail/GmailCallback'
 import './styles/theme.css'
 
-type PageName = ViewName | 'import'
+
+type PageName = ViewName | 'import' | 'gmail-callback'
+
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -27,6 +30,16 @@ export default function App() {
   const [transactions, setTransactions] = useState<any[]>([])
   const initialized = useRef(false)
 
+  // Googleの同意画面から /auth/gmail/callback?code=... に戻ってきた場合、
+  // 起動時のURLパスを見てgmail-callback画面を表示する。
+  // (React Routerは使わず、App.tsx既存のpage state方式に合わせている)
+  useEffect(() => {
+    if (window.location.pathname === '/auth/gmail/callback') {
+      setPage('gmail-callback')
+    }
+  }, [])
+
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -36,6 +49,7 @@ export default function App() {
         loadData(data.session.user.id)
       }
     })
+
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
@@ -50,8 +64,10 @@ export default function App() {
       }
     })
 
+
     return () => listener.subscription.unsubscribe()
   }, [])
+
 
   async function loadData(userId: string) {
     await ensureDefaultCategories(userId)
@@ -60,29 +76,35 @@ export default function App() {
     setTransactions(txs || [])
   }
 
+
   async function refreshTransactions() {
     if (!session) return
     const txs = await fetchTransactions(session.user.id)
     setTransactions(txs || [])
   }
 
+
   async function signInWithGoogle() {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }
 
+
   async function signOut() {
     await supabase.auth.signOut()
   }
+
 
   function changeView(v: ViewName) {
     setView(v)
     setPage(v)
   }
 
+
   function openAddNew() {
     setEditingTx(null)
     setAddOpen(true)
   }
+
 
   function openEdit(tx: any) {
     setEditingTx({
@@ -97,10 +119,12 @@ export default function App() {
     setAddOpen(true)
   }
 
+
   function closeSheet() {
     setAddOpen(false)
     setEditingTx(null)
   }
+
 
   async function handleSubmit(input: {
     type: 'expense' | 'income'
@@ -119,14 +143,19 @@ export default function App() {
     await refreshTransactions()
   }
 
+
   async function handleDeleteTransaction(id: string) {
     await deleteTransaction(id)
     await refreshTransactions()
   }
 
+
   if (loading) return null
 
+
   if (!session) {
+    // Gmailコールバック待ちの場合でも未ログインなら通常のログイン画面を出す
+    // (Gmail連携はログイン後にのみ許可するため、未ログイン状態でcodeが来ることは想定しない)
     return (
       <div className="login-screen">
         <div className="brand"><span>♥</span>Budgety</div>
@@ -140,12 +169,23 @@ export default function App() {
     )
   }
 
+  if (page === 'gmail-callback') {
+    return (
+      <GmailCallback
+        userId={session.user.id}
+        onDone={() => setPage('more')}
+      />
+    )
+  }
+
+
   return (
     <div className="app">
       <header className="top">
         <div className="brand"><span>♥</span>Budgety</div>
         <div className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</div>
       </header>
+
 
       {page === 'home' && (
         <Home
@@ -160,6 +200,7 @@ export default function App() {
       )}
       {page === 'more' && (
         <More
+          userId={session.user.id}
           userEmail={session.user.email}
           onSignOut={signOut}
           onOpenImport={() => setPage('import')}
@@ -177,7 +218,9 @@ export default function App() {
         />
       )}
 
+
       {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
+
 
       <AddSheet
         open={addOpen}

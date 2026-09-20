@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
+    "googleapis": "^181.0.0",
     "papaparse": "^5.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
@@ -23,6 +24,7 @@
     "@vercel/node": "^13.0.1",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "supabase": "^2.117.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

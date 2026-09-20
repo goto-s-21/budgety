@@ -1,15 +1,19 @@
+import { GmailConnectionCard } from '../features/gmail/GmailConnectionCard'
+
 interface Props {
+  userId: string
   userEmail: string | undefined
   onSignOut: () => void
   onOpenImport: () => void
 }
 
-export default function More({ userEmail, onSignOut, onOpenImport }: Props) {
+export default function More({ userId, userEmail, onSignOut, onOpenImport }: Props) {
   return (
     <>
       <div className="section-head">
         <h2>その他</h2>
       </div>
+
 
       <section className="card">
         <div className="spend-row">
@@ -28,15 +32,10 @@ export default function More({ userEmail, onSignOut, onOpenImport }: Props) {
           </div>
           <span>›</span>
         </button>
-        <div className="spend-row">
-          <div className="icon">✉️</div>
-          <div className="grow">
-            <div className="name">Gmail連携</div>
-            <div className="sub">利用通知の自動取得（GitHub Actions経由）</div>
-          </div>
-          <span>›</span>
-        </div>
+
+        <GmailConnectionCard userId={userId} />
       </section>
+
 
       <section className="card">
         <div className="section-head">
