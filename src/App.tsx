@@ -16,7 +16,9 @@ import Import from './pages/Import'
 import './styles/theme.css'
 
 
+
 type PageName = ViewName | 'import'
+
 
 
 export default function App() {
@@ -32,6 +34,7 @@ export default function App() {
   const initialized = useRef(false)
 
 
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -41,6 +44,7 @@ export default function App() {
         loadData(data.session.user.id)
       }
     })
+
 
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -57,8 +61,10 @@ export default function App() {
     })
 
 
+
     return () => listener.subscription.unsubscribe()
   }, [])
+
 
 
   async function loadData(userId: string) {
@@ -69,11 +75,13 @@ export default function App() {
   }
 
 
+
   async function refreshTransactions() {
     if (!session) return
     const txs = await fetchTransactions(session.user.id)
     setTransactions(txs || [])
   }
+
 
   async function handleRefresh() {
     if (!session || refreshing) return
@@ -88,14 +96,17 @@ export default function App() {
   }
 
 
+
   async function signInWithGoogle() {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }
 
 
+
   async function signOut() {
     await supabase.auth.signOut()
   }
+
 
 
   function changeView(v: ViewName) {
@@ -104,10 +115,12 @@ export default function App() {
   }
 
 
+
   function openAddNew() {
     setEditingTx(null)
     setAddOpen(true)
   }
+
 
 
   function openEdit(tx: any) {
@@ -124,10 +137,12 @@ export default function App() {
   }
 
 
+
   function closeSheet() {
     setAddOpen(false)
     setEditingTx(null)
   }
+
 
 
   async function handleSubmit(input: {
@@ -148,13 +163,16 @@ export default function App() {
   }
 
 
+
   async function handleDeleteTransaction(id: string) {
     await deleteTransaction(id)
     await refreshTransactions()
   }
 
 
+
   if (loading) return null
+
 
 
   if (!session) {
@@ -170,6 +188,7 @@ export default function App() {
       </div>
     )
   }
+
 
 
   return (
@@ -190,6 +209,7 @@ export default function App() {
       </header>
 
 
+
       {page === 'home' && (
     <Home
       transactions={transactions}
@@ -203,6 +223,7 @@ export default function App() {
       )}
       {page === 'more' && (
         <More
+          userId={session.user.id}
           userEmail={session.user.email}
           onSignOut={signOut}
           onOpenImport={() => setPage('import')}
@@ -221,7 +242,9 @@ export default function App() {
       )}
 
 
+
       {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
+
 
 
       <AddSheet
