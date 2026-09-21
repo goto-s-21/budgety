@@ -1,4 +1,5 @@
-import type { GmailMessage, ParsedTransaction, PaymentNotificationParser } from '../types'
+import { GmailMessage } from '../types'
+import type { ParsedTransaction, PaymentNotificationParser } from '../types'
 
 function parseAmount(value: string): number {
   return Number(value.replace(/[\s,円]/g, '')) || 0
@@ -22,14 +23,14 @@ function isSmbcSender(from: string): boolean {
 export const SmbcUsageNoticeParser: PaymentNotificationParser = {
   name: 'smbc_usage_notice',
 
-  canParse(message) {
+  canParse(message: GmailMessage) {
     return (
       isSmbcSender(message.from) &&
       /ご利用日時\s*[：:]\s*\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(message.body)
     )
   },
 
-  parse(message): ParsedTransaction | null {
+  parse(message: GmailMessage): ParsedTransaction | null {
     const dateMatch = message.body.match(
       /ご利用日時\s*[：:]\s*(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/
     )
