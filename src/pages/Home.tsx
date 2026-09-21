@@ -13,13 +13,21 @@ interface TxRow {
 
 interface Props {
   transactions: TxRow[]
+  totalAssets: number | null
+  hasReset: boolean
   onSeeAnalysis: () => void
   onSeeHistory: () => void
+  onAssetReset: (balance: number) => Promise<void>
+  onAssetAdjust: (delta: number) => Promise<void>
 }
 
-export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Props) {
-  // 表示中の月。History.tsxと同じnavigatePeriod('month', period, delta)を利用する。
+type AssetModal = 'reset' | 'adjust' | null
+
+export default function Home({ transactions, totalAssets, hasReset, onSeeAnalysis, onSeeHistory, onAssetReset, onAssetAdjust }: Props) {
   const [month, setMonth] = useState(thisMonth())
+  const [assetModal, setAssetModal] = useState<AssetModal>(null)
+  const [assetInput, setAssetInput] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const now = transactions.filter((t) => monthKey(t.date) === month)
   const income = now.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0)
@@ -32,16 +40,54 @@ export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Prop
       const name = t.categories?.name || '未分類'
       catTotals[name] = (catTotals[name] || 0) + t.amount
     })
-  // 支出が多い順にソート
   const catRows = Object.entries(catTotals).sort((a, b) => b[1] - a[1])
   const maxCat = catRows[0]?.[1] || 1
 
-  const recent = now
-    .filter((t) => t.type === 'expense')
-    .slice(0, 3)
+  const recent = now.filter((t) => t.type === 'expense').slice(0, 3)
+
+  function openModal(mode: AssetModal) {
+    setAssetInput('')
+    setAssetModal(mode)
+  }
+
+  async function handleAssetSubmit() {
+    const val = parseFloat(assetInput.replace(/,/g, ''))
+    if (isNaN(val)) return
+    setSaving(true)
+    try {
+      if (assetModal === 'reset') {
+        await onAssetReset(val)
+      } else if (assetModal === 'adjust') {
+        await onAssetAdjust(val)
+      }
+      setAssetModal(null)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <>
+      {/* 総資産カード */}
+      <section className="card asset-card">
+        <div className="asset-header">
+          <span className="asset-label">総資産（口座残高）</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {hasReset && (
+              <button className="asset-action-btn" onClick={() => openModal('adjust')}>微調整</button>
+            )}
+            <button className="asset-action-btn" onClick={() => openModal('reset')}>
+              {hasReset ? 'リセット' : '設定'}
+            </button>
+          </div>
+        </div>
+        {totalAssets !== null ? (
+          <div className="asset-amount">{yen(totalAssets)}</div>
+        ) : (
+          <div className="asset-unset">残高を設定してください</div>
+        )}
+      </section>
+
       <section className="card">
         <div className="period-nav">
           <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, -1))}>‹</button>
@@ -106,6 +152,57 @@ export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Prop
           </div>
         ))}
       </section>
+
+      {/* 総資産モーダル */}
+      <div
+        className={`modal ${assetModal ? 'open' : ''}`}
+        onClick={(e) => { if (e.target === e.currentTarget) setAssetModal(null) }}
+      >
+        <div className="sheet">
+          <div className="sheet-head">
+            <h2>
+              {assetModal === 'reset'
+                ? (hasReset ? '総資産をリセット' : '総資産を設定')
+                : '微調整'}
+            </h2>
+            <button className="close" onClick={() => setAssetModal(null)}>✕</button>
+          </div>
+
+          {assetModal === 'reset' ? (
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '12px 0' }}>
+              現在の口座残高を入力してください。この時点から収支を追跡します。
+            </p>
+          ) : (
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '12px 0' }}>
+              総資産に加減算する金額を入力してください。<br />
+              減らす場合はマイナスで入力（例：-3000）。
+            </p>
+          )}
+
+          <div className="form">
+            <label>{assetModal === 'reset' ? '口座残高（円）' : '調整額（円）'}</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={assetInput}
+              onChange={(e) => setAssetInput(e.target.value)}
+              placeholder={assetModal === 'reset' ? '例: 500000' : '例: 3000 または -3000'}
+              autoFocus
+            />
+          </div>
+
+          <button
+            className="primary"
+            onClick={handleAssetSubmit}
+            disabled={!assetInput || saving}
+          >
+            {saving ? '保存中…' : '保存する'}
+          </button>
+          <button className="secondary" onClick={() => setAssetModal(null)}>
+            キャンセル
+          </button>
+        </div>
+      </div>
     </>
   )
 }

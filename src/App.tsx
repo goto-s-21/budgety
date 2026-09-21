@@ -3,6 +3,8 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { ensureDefaultCategories, fetchCategories } from './lib/categories'
 import { addTransaction, updateTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
+import { fetchSnapshots, addReset, addAdjustment, computeTotalAssets } from './lib/assets'
+import type { AssetSnapshot } from './lib/assets'
 import { IconRefresh } from './components/Icons'
 import BottomNav from './components/BottomNav'
 import type { ViewName } from './components/BottomNav'
@@ -30,6 +32,7 @@ export default function App() {
   const [editingTx, setEditingTx] = useState<EditableTransaction | null>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
+  const [snapshots, setSnapshots] = useState<AssetSnapshot[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const initialized = useRef(false)
 
@@ -69,9 +72,14 @@ export default function App() {
 
   async function loadData(userId: string) {
     await ensureDefaultCategories(userId)
-    const [cats, txs] = await Promise.all([fetchCategories(userId), fetchTransactions(userId)])
+    const [cats, txs, snaps] = await Promise.all([
+      fetchCategories(userId),
+      fetchTransactions(userId),
+      fetchSnapshots(userId),
+    ])
     setCategories(cats || [])
     setTransactions(txs || [])
+    setSnapshots(snaps || [])
   }
 
 
@@ -87,12 +95,29 @@ export default function App() {
     if (!session || refreshing) return
     setRefreshing(true)
     try {
-      const [cats, txs] = await Promise.all([fetchCategories(session.user.id), fetchTransactions(session.user.id)])
+      const [cats, txs, snaps] = await Promise.all([
+        fetchCategories(session.user.id),
+        fetchTransactions(session.user.id),
+        fetchSnapshots(session.user.id),
+      ])
       setCategories(cats || [])
       setTransactions(txs || [])
+      setSnapshots(snaps || [])
     } finally {
       setRefreshing(false)
     }
+  }
+
+  async function handleAssetReset(balance: number) {
+    if (!session) return
+    await addReset(session.user.id, balance)
+    setSnapshots(await fetchSnapshots(session.user.id))
+  }
+
+  async function handleAssetAdjust(delta: number) {
+    if (!session) return
+    await addAdjustment(session.user.id, delta)
+    setSnapshots(await fetchSnapshots(session.user.id))
   }
 
 
@@ -211,12 +236,16 @@ export default function App() {
 
 
       {page === 'home' && (
-    <Home
-      transactions={transactions}
-      onSeeAnalysis={() => changeView('analysis')}
-      onSeeHistory={() => changeView('history')}
-    />
-    )}
+        <Home
+          transactions={transactions}
+          totalAssets={computeTotalAssets(snapshots, transactions)}
+          hasReset={snapshots.some((s) => s.type === 'reset')}
+          onSeeAnalysis={() => changeView('analysis')}
+          onSeeHistory={() => changeView('history')}
+          onAssetReset={handleAssetReset}
+          onAssetAdjust={handleAssetAdjust}
+        />
+      )}
       {page === 'analysis' && <Analysis transactions={transactions} />}
       {page === 'history' && (
         <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />
