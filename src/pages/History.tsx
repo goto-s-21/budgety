@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { yen, formatDate } from '../lib/formatters'
+import { yen, formatDate, todayKey, formatPeriodLabel, navigatePeriod } from '../lib/formatters'
+import type { PeriodUnit } from '../lib/formatters'
 import { CategoryIcon, IconIncome, IconPencil } from '../components/Icons'
 
 interface TxRow {
@@ -21,10 +22,25 @@ interface Props {
 
 type Filter = 'all' | 'expense' | 'income'
 
+const today = todayKey()
+
 export default function History({ transactions, onAdd, onEdit }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
+  const [unit, setUnit] = useState<PeriodUnit>('month')
+  const [period, setPeriod] = useState(today.slice(0, 7))
 
-  const rows = transactions.filter((t) => filter === 'all' || t.type === filter)
+  function switchUnit(newUnit: PeriodUnit) {
+    if (newUnit === 'year') setPeriod(today.slice(0, 4))
+    else if (newUnit === 'month') setPeriod(today.slice(0, 7))
+    else setPeriod(today)
+    setUnit(newUnit)
+  }
+
+  const rows = transactions.filter((t) => {
+    const typeMatch = filter === 'all' || t.type === filter
+    const periodMatch = t.date.startsWith(period)
+    return typeMatch && periodMatch
+  })
 
   return (
     <>
@@ -43,6 +59,25 @@ export default function History({ transactions, onAdd, onEdit }: Props) {
         <button className={filter === 'income' ? 'tab active' : 'tab'} onClick={() => setFilter('income')}>
           収入
         </button>
+      </div>
+
+      <div className="period-bar">
+        <div className="period-units">
+          {(['year', 'month', 'day'] as PeriodUnit[]).map((u) => (
+            <button
+              key={u}
+              className={unit === u ? 'punit active' : 'punit'}
+              onClick={() => switchUnit(u)}
+            >
+              {u === 'year' ? '年' : u === 'month' ? '月' : '日'}
+            </button>
+          ))}
+        </div>
+        <div className="period-nav">
+          <button className="pnav" onClick={() => setPeriod(navigatePeriod(unit, period, -1))}>‹</button>
+          <span className="period-label">{formatPeriodLabel(unit, period)}</span>
+          <button className="pnav" onClick={() => setPeriod(navigatePeriod(unit, period, 1))}>›</button>
+        </div>
       </div>
 
       <section className="card">
@@ -64,7 +99,7 @@ export default function History({ transactions, onAdd, onEdit }: Props) {
             <div className="grow">
               <div className="name">{t.merchants?.canonical_name || '未設定'}</div>
               <div className="sub">
-                {t.categories?.name || '未分類'} ・ {formatDate(t.date)}
+                {t.type === 'income' ? '収入' : (t.categories?.name || '未分類')} ・ {formatDate(t.date)}
               </div>
             </div>
             <span className="edit-pencil" aria-hidden="true">

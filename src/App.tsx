@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { ensureDefaultCategories, fetchCategories } from './lib/categories'
 import { addTransaction, updateTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
+import { IconRefresh } from './components/Icons'
 import BottomNav from './components/BottomNav'
 import type { ViewName } from './components/BottomNav'
 import AddSheet from './components/AddSheet'
@@ -27,6 +28,7 @@ export default function App() {
   const [editingTx, setEditingTx] = useState<EditableTransaction | null>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
+  const [refreshing, setRefreshing] = useState(false)
   const initialized = useRef(false)
 
 
@@ -71,6 +73,18 @@ export default function App() {
     if (!session) return
     const txs = await fetchTransactions(session.user.id)
     setTransactions(txs || [])
+  }
+
+  async function handleRefresh() {
+    if (!session || refreshing) return
+    setRefreshing(true)
+    try {
+      const [cats, txs] = await Promise.all([fetchCategories(session.user.id), fetchTransactions(session.user.id)])
+      setCategories(cats || [])
+      setTransactions(txs || [])
+    } finally {
+      setRefreshing(false)
+    }
   }
 
 
@@ -162,7 +176,17 @@ export default function App() {
     <div className="app">
       <header className="top">
         <div className="brand"><span>♥</span>Budgety</div>
-        <div className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</span>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={refreshing ? 'refresh-btn spinning' : 'refresh-btn'}
+            aria-label="更新"
+          >
+            <IconRefresh color="var(--muted)" />
+          </button>
+        </div>
       </header>
 
 

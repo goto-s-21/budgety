@@ -134,6 +134,13 @@ export const IconIncome = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
+export const IconRefresh = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4" />
+    <path d="M20 12a8 8 0 0 1-14 5.3M4 20v-4h4" />
+  </svg>
+)
+
 export const IconPencil = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)} width={14} height={14}>
     <path d="M4 20l1-4 11-11 3 3-11 11-4 1z" />
