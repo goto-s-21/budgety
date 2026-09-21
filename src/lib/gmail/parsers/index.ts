@@ -1,10 +1,12 @@
 import type { GmailMessage, ParsedTransaction, PaymentNotificationParser } from '../types'
+import { SmbcUsageNoticeParser } from './smbcUsageNotice'
 import { SmbcCardParser } from './smbc'
 import { RakutenPayParser } from './rakutenPay'
 import { PaypayCardParser } from './paypayCard'
 import { MercariParser } from './mercari'
 
 export const PARSERS: PaymentNotificationParser[] = [
+  SmbcUsageNoticeParser,
   SmbcCardParser,
   RakutenPayParser,
   PaypayCardParser,
