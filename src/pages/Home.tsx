@@ -1,4 +1,5 @@
-import { yen, monthKey, thisMonth } from '../lib/formatters'
+import { useState } from 'react'
+import { yen, monthKey, thisMonth, formatPeriodLabel, navigatePeriod } from '../lib/formatters'
 import { CategoryIcon } from '../components/Icons'
 
 interface TxRow {
@@ -17,8 +18,10 @@ interface Props {
 }
 
 export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Props) {
-  const m = thisMonth()
-  const now = transactions.filter((t) => monthKey(t.date) === m)
+  // 表示中の月。History.tsxと同じnavigatePeriod('month', period, delta)を利用する。
+  const [month, setMonth] = useState(thisMonth())
+
+  const now = transactions.filter((t) => monthKey(t.date) === month)
   const income = now.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expense = now.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
 
@@ -29,15 +32,24 @@ export default function Home({ transactions, onSeeAnalysis, onSeeHistory }: Prop
       const name = t.categories?.name || '未分類'
       catTotals[name] = (catTotals[name] || 0) + t.amount
     })
+  // 支出が多い順にソート
   const catRows = Object.entries(catTotals).sort((a, b) => b[1] - a[1])
   const maxCat = catRows[0]?.[1] || 1
 
-  const recent = transactions
+  const recent = now
     .filter((t) => t.type === 'expense')
     .slice(0, 3)
 
   return (
     <>
+      <section className="card">
+        <div className="period-nav">
+          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, -1))}>‹</button>
+          <span className="period-label">{formatPeriodLabel('month', month)}</span>
+          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, 1))}>›</button>
+        </div>
+      </section>
+
       <section className="hero">
         <div className="eyebrow">今月の残り</div>
         <div className="balance">{yen(income - expense)}</div>

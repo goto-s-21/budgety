@@ -191,12 +191,12 @@ export default function App() {
 
 
       {page === 'home' && (
-        <Home
-          transactions={transactions}
-          onSeeAnalysis={() => changeView('analysis')}
-          onSeeHistory={() => changeView('history')}
-        />
-      )}
+    <Home
+      transactions={transactions}
+      onSeeAnalysis={() => changeView('analysis')}
+      onSeeHistory={() => changeView('history')}
+    />
+    )}
       {page === 'analysis' && <Analysis transactions={transactions} />}
       {page === 'history' && (
         <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />
