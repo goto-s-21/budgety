@@ -1,5 +1,4 @@
-import { GmailMessage } from '../types'
-import type { ParsedTransaction, PaymentNotificationParser } from '../types'
+import type { GmailMessage, ParsedTransaction, PaymentNotificationParser } from '../types'
 
 function parseAmount(value: string): number {
   return Number(value.replace(/[\s,円]/g, '')) || 0
