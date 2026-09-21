@@ -66,7 +66,7 @@ export default function AddSheet({ open, categories, editing, onClose, onSubmit,
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!form.categoryId) return
+    if (form.type === 'expense' && !form.categoryId) return
     setSaving(true)
     try {
       await onSubmit({
@@ -108,14 +108,14 @@ export default function AddSheet({ open, categories, editing, onClose, onSubmit,
           <button
             type="button"
             className={form.type === 'expense' ? 'selected' : ''}
-            onClick={() => setForm((f) => ({ ...f, type: 'expense' }))}
+            onClick={() => setForm((f) => ({ ...f, type: 'expense', categoryId: '' }))}
           >
             支出
           </button>
           <button
             type="button"
             className={form.type === 'income' ? 'selected' : ''}
-            onClick={() => setForm((f) => ({ ...f, type: 'income' }))}
+            onClick={() => setForm((f) => ({ ...f, type: 'income', categoryId: '' }))}
           >
             収入
           </button>
@@ -140,19 +140,23 @@ export default function AddSheet({ open, categories, editing, onClose, onSubmit,
             onChange={(e) => setForm((f) => ({ ...f, merchant: e.target.value }))}
           />
 
-          <label>カテゴリー</label>
-          <select
-            required
-            value={form.categoryId}
-            onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-          >
-            <option value="">選択してください</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icon} {c.name}
-              </option>
-            ))}
-          </select>
+          {form.type === 'expense' && (
+            <>
+              <label>カテゴリー</label>
+              <select
+                required
+                value={form.categoryId}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+              >
+                <option value="">選択してください</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.icon} {c.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
 
           <label>日付</label>
           <input

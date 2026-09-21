@@ -57,7 +57,7 @@ export async function addTransaction(input: AddTransactionInput) {
     amount: input.amount,
     type: input.type,
     merchant_id: merchantId,
-    category_id: input.categoryId,
+    category_id: input.categoryId || null,
     source: 'manual',
     memo: input.memo || null,
     confidence: 'high',
@@ -78,7 +78,7 @@ export async function updateTransaction(input: UpdateTransactionInput) {
       amount: input.amount,
       type: input.type,
       merchant_id: merchantId,
-      category_id: input.categoryId,
+      category_id: input.categoryId || null,
       memo: input.memo || null,
       updated_at: new Date().toISOString(),
     })
