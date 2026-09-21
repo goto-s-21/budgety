@@ -72,9 +72,11 @@ button{border:0;cursor:pointer}
 .plus{background:var(--primary)!important;color:#fff!important;border-radius:50%;width:56px;height:56px;justify-self:center;box-shadow:0 8px 18px rgba(216,92,130,.35);display:flex!important;align-items:center;justify-content:center;padding:0;flex-direction:row!important}
 .plus span{font-size:26px!important;line-height:1;display:block;margin:0;padding:0;transform:translateY(-1px)}
 
-.modal{position:fixed;inset:0;background:rgba(69,64,69,.28);display:none;align-items:end;z-index:10}
+.modal{position:fixed;inset:0;background:rgba(69,64,69,.28);display:none;align-items:center;justify-content:center;padding:24px;z-index:10}
 .modal.open{display:flex}
-.sheet{background:#fff;width:min(100%,460px);margin:auto;border-radius:30px 30px 0 0;padding:20px 20px calc(28px + env(safe-area-inset-bottom))}
+.modal--bottom{align-items:flex-end;padding:0}
+.modal--bottom .sheet{margin:0 auto 12px}
+.sheet{background:#fff;width:min(100%,460px);margin:0 auto 12px;border-radius:28px;padding:20px 20px calc(28px + env(safe-area-inset-bottom))}
 .sheet-head{display:flex;justify-content:space-between;align-items:center}
 .sheet h2{font-size:18px;margin:0}
 .close{background:#fff3f6;color:var(--dark);border-radius:50%;width:32px;height:32px}
@@ -242,7 +244,7 @@ button{border:0;cursor:pointer}
   color: var(--muted);
 }
 
-.asset-card { margin-bottom: 0 }
+.asset-card { margin-bottom: 14px }
 .asset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px }
 .asset-label { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .5px }
 .asset-action-btn { background: #fff0f4; color: var(--dark); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700 }

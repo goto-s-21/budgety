@@ -68,6 +68,14 @@ export default function Home({ transactions, totalAssets, hasReset, onSeeAnalysi
 
   return (
     <>
+      <section className="card">
+        <div className="period-nav">
+          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, -1))}>‹</button>
+          <span className="period-label">{formatPeriodLabel('month', month)}</span>
+          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, 1))}>›</button>
+        </div>
+      </section>
+
       {/* 総資産カード */}
       <section className="card asset-card">
         <div className="asset-header">
@@ -86,14 +94,6 @@ export default function Home({ transactions, totalAssets, hasReset, onSeeAnalysi
         ) : (
           <div className="asset-unset">残高を設定してください</div>
         )}
-      </section>
-
-      <section className="card">
-        <div className="period-nav">
-          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, -1))}>‹</button>
-          <span className="period-label">{formatPeriodLabel('month', month)}</span>
-          <button className="pnav" onClick={() => setMonth(navigatePeriod('month', month, 1))}>›</button>
-        </div>
       </section>
 
       <section className="hero">

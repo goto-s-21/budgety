@@ -97,7 +97,7 @@ export default function AddSheet({ open, categories, editing, onClose, onSubmit,
   }
 
   return (
-    <div className="modal open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal modal--bottom open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <div className="sheet-head">
           <h2>{isEditing ? '記録を編集' : '記録を追加'}</h2>
