@@ -30,7 +30,7 @@ const PALETTE = [
   '#4C6EF5', '#F76707', '#12B886', '#F03E3E',
   '#7048E8', '#FAB005', '#1098AD', '#E64980',
 ]
-function colorFor(name: string, index: number): string {
+function colorFor(_name: string, index: number): string {
   return PALETTE[index % PALETTE.length]
 }
 

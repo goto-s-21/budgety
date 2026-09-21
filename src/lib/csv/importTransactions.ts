@@ -288,11 +288,8 @@ async function fetchApproximateMatch(
   if (error) throw error
 
   const rows = (data || []) as any[]
-  const filtered = history.service_name
-    ? rows.filter((r) => true) // source_detailは選択していないため、サービス名の厳密一致は行わずcreated_at近接のみで判定する
-    : rows
-
-  return filtered as unknown as ImportedTransactionRow[]
+  // source_detailは選択していないため、サービス名の厳密一致は行わずcreated_at近接のみで判定する
+  return rows as unknown as ImportedTransactionRow[]
 }
 
 // 指定した取り込み回で登録された取引を取得する。
