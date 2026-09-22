@@ -19,46 +19,81 @@ function isSmbcSender(from: string): boolean {
   )
 }
 
+function parseVpassDetail(message: GmailMessage): ParsedTransaction | null {
+  const dateMatch = message.body.match(
+    /◇利用日\s*[：:]\s*(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/
+  )
+  const merchantMatch = message.body.match(
+    /◇利用先\s*[：:]\s*([^\r\n]+)/
+  )
+  const amountMatch = message.body.match(
+    /◇利用金額\s*[：:]\s*([\d,]+)\s*円/
+  )
+
+  if (!dateMatch || !merchantMatch || !amountMatch) return null
+
+  const [, year, month, day, hour, minute] = dateMatch
+  const merchant = normalizeMerchant(merchantMatch[1])
+  const amount = parseAmount(amountMatch[1])
+
+  if (!merchant || amount <= 0) return null
+
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hour}:${minute}`,
+    merchant,
+    amount,
+    paymentMethod: 'smbc_card',
+    source: 'gmail',
+    sourceId: message.id,
+    sourceDetail: '三井住友カード利用速報',
+  }
+}
+
+function parseLegacyUsageNotice(message: GmailMessage): ParsedTransaction | null {
+  const dateMatch = message.body.match(
+    /ご利用日時\s*[：:]\s*(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/
+  )
+
+  if (!dateMatch) return null
+
+  const [, year, month, day, hour, minute] = dateMatch
+  const afterDate = message.body.slice((dateMatch.index || 0) + dateMatch[0].length)
+  const detailMatch = afterDate.match(
+    /([^\r\n]+?)\s*[（(][^）)\r\n]*[）)]\s*(?:[\t ]*([\d,]+)\s*円|\r?\n\s*([\d,]+)\s*円)/
+  )
+
+  if (!detailMatch) return null
+
+  const merchant = normalizeMerchant(detailMatch[1])
+  const amount = parseAmount(detailMatch[2] || detailMatch[3] || '')
+
+  if (!merchant || amount <= 0) return null
+
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hour}:${minute}`,
+    merchant,
+    amount,
+    paymentMethod: 'smbc_card',
+    source: 'gmail',
+    sourceId: message.id,
+    sourceDetail: '三井住友カード利用速報',
+  }
+}
+
 export const SmbcUsageNoticeParser: PaymentNotificationParser = {
   name: 'smbc_usage_notice',
 
-  canParse(message: GmailMessage) {
+  canParse(message) {
     return (
       isSmbcSender(message.from) &&
-      /ご利用日時\s*[：:]\s*\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(message.body)
+      (/◇利用日\s*[：:]\s*\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(message.body) ||
+        /ご利用日時\s*[：:]\s*\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(message.body))
     )
   },
 
-  parse(message: GmailMessage): ParsedTransaction | null {
-    const dateMatch = message.body.match(
-      /ご利用日時\s*[：:]\s*(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/
-    )
-
-    if (!dateMatch) return null
-
-    const [, year, month, day, hour, minute] = dateMatch
-    const afterDate = message.body.slice((dateMatch.index || 0) + dateMatch[0].length)
-
-    const detailMatch = afterDate.match(
-      /([^\r\n]+?)\s*[（(][^）)\r\n]*[）)]\s*(?:[\t ]*([\d,]+)\s*円|\r?\n\s*([\d,]+)\s*円)/
-    )
-
-    if (!detailMatch) return null
-
-    const merchant = normalizeMerchant(detailMatch[1])
-    const amount = parseAmount(detailMatch[2] || detailMatch[3] || '')
-
-    if (!merchant || amount <= 0) return null
-
-    return {
-      date: `${year}-${month}-${day}`,
-      time: `${hour}:${minute}`,
-      merchant,
-      amount,
-      paymentMethod: 'smbc_card',
-      source: 'gmail',
-      sourceId: message.id,
-      sourceDetail: '三井住友カード利用速報',
-    }
+  parse(message) {
+    return parseVpassDetail(message) || parseLegacyUsageNotice(message)
   },
 }
