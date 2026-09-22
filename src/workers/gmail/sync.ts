@@ -198,12 +198,27 @@ async function syncUser(connection: {
   let failedCount = 0
 
   for (const message of messages) {
-    const parsed = parseMessage(message)
+  console.log(
+    `[gmail-sync] message id=${message.id} from=${message.from} subject=${message.subject}`
+  )
 
-    // パース対象外のメールは無視する
-    if (!parsed) {
-      continue
-    }
+  console.log(
+    `[gmail-sync] body=${message.body.slice(0, 1000)}`
+  )
+
+  const parsed = parseMessage(message)
+
+if (!parsed) {
+  console.log(
+    `[gmail-sync] parse skipped id=${message.id} from=${message.from}`
+  )
+  continue
+}
+
+console.log(
+  `[gmail-sync] parsed date=${parsed.date} amount=${parsed.amount} merchant=${parsed.merchant} source=${parsed.sourceId}`
+)
+    
 
     try {
       // Gmailメール自体の重複チェック
