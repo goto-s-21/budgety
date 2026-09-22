@@ -11,17 +11,25 @@ function normalizeMerchant(value: string): string {
     .trim()
 }
 
+function isSmbcSender(from: string): boolean {
+  const normalized = from.toLowerCase()
+  return (
+    normalized.includes('statement@vpass.ne.jp') ||
+    normalized.includes('webmaster@smbc-card.com')
+  )
+}
+
 export const SmbcUsageNoticeParser: PaymentNotificationParser = {
   name: 'smbc_usage_notice',
 
-  canParse(message) {
+  canParse(message: GmailMessage) {
     return (
-      message.from.toLowerCase().includes('webmaster@smbc-card.com') &&
+      isSmbcSender(message.from) &&
       /ご利用日時\s*[：:]\s*\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(message.body)
     )
   },
 
-  parse(message): ParsedTransaction | null {
+  parse(message: GmailMessage): ParsedTransaction | null {
     const dateMatch = message.body.match(
       /ご利用日時\s*[：:]\s*(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/
     )
@@ -29,15 +37,16 @@ export const SmbcUsageNoticeParser: PaymentNotificationParser = {
     if (!dateMatch) return null
 
     const [, year, month, day, hour, minute] = dateMatch
+    const afterDate = message.body.slice((dateMatch.index || 0) + dateMatch[0].length)
 
-    const detailMatch = message.body.match(
-      /([^\r\n]+?)\s*[（(][^）)\r\n]*[）)]\s*[\t ]*([\d,]+)\s*円/
+    const detailMatch = afterDate.match(
+      /([^\r\n]+?)\s*[（(][^）)\r\n]*[）)]\s*(?:[\t ]*([\d,]+)\s*円|\r?\n\s*([\d,]+)\s*円)/
     )
 
     if (!detailMatch) return null
 
     const merchant = normalizeMerchant(detailMatch[1])
-    const amount = parseAmount(detailMatch[2])
+    const amount = parseAmount(detailMatch[2] || detailMatch[3] || '')
 
     if (!merchant || amount <= 0) return null
 
