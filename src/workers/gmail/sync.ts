@@ -1,10 +1,3 @@
-// src/workers/gmail/sync.ts
-// GitHub Actionsから直接実行するGmail同期スクリプト(Node.js)。
-// 日本時間23:00に1日1回実行し、gmail_sync_state.last_synced_at以降の
-// 差分メールを取得してパースし、transactionsへ登録する。
-//
-// 実行コマンド例: npx tsx src/workers/gmail/sync.ts
-
 import { createClient } from '@supabase/supabase-js'
 import { refreshAccessToken, fetchMessagesSince } from '../../lib/gmail/gmailClient'
 import { parseMessage } from '../../lib/gmail/parsers'
@@ -25,117 +18,49 @@ function formatGmailDate(d: Date): string {
   return `${y}/${m}/${day}`
 }
 
-function normalizeCategoryMerchantName(value: string): string {
-  return value
-    .normalize('NFKC')
-    .replace(/[－‐‑‒–—―ー]/g, '-')
-    .replace(/[\s・]/g, '')
-    .toLowerCase()
+function normalizeMerchantName(value: string): string {
+  return value.normalize('NFKC').replace(/[－‐‑‒–—―ー]/g, '-').replace(/[\s・]/g, '').toLowerCase()
 }
 
-async function resolveMerchantId(
-  userId: string,
-  merchantName: string
-): Promise<string | null> {
-  const normalizedName = normalizeMerchantName(merchantName)
+function normalizeCategoryMerchantName(value: string): string {
+  return normalizeMerchantName(value)
+}
 
-  if (!normalizedName) {
-    return null
-  }
-
-  const { data: merchants, error: selectError } = await supabase
+async function resolveMerchantId(userId: string, merchantName: string): Promise<string | null> {
+  const normalized = normalizeMerchantName(merchantName)
+  const { data: existing, error: findError } = await supabase
     .from('merchants')
     .select('id, canonical_name')
     .eq('user_id', userId)
 
-  if (selectError) {
-    throw selectError
-  }
+  if (findError) throw findError
 
-  const existingMerchant = (merchants || []).find((merchant) =>
-    normalizeMerchantName(merchant.canonical_name || '') === normalizedName
-  )
+  const match = (existing || []).find((merchant: any) => {
+    const name = normalizeMerchantName(merchant.canonical_name || '')
+    return name && (name.includes(normalized) || normalized.includes(name))
+  })
 
-  if (existingMerchant) {
-    return existingMerchant.id
-  }
+  if (match) return match.id
 
-  const { data: createdMerchant, error: insertError } = await supabase
+  const { data, error } = await supabase
     .from('merchants')
-    .insert({
-      user_id: userId,
-      canonical_name: merchantName,
-    })
+    .insert({ user_id: userId, canonical_name: merchantName })
     .select('id')
     .single()
 
-  if (insertError) {
-    throw insertError
-  }
-
-  return createdMerchant?.id || null
+  if (error) throw error
+  return data?.id || null
 }
 
-async function resolveCategoryId(
-  userId: string,
-  merchantName: string,
-  uncategorizedId: string | null
-): Promise<string | null> {
+async function resolveCategoryId(userId: string, merchantName: string, uncategorizedId: string | null): Promise<string | null> {
   const normalized = normalizeCategoryMerchantName(merchantName)
-
-  const convenienceStoreKeywords = [
-    'セブン-イレブン',
-    'セブンイレブン',
-    '7-eleven',
-    '7eleven',
-    'ファミリーマート',
-    'ファミマ',
-    'familymart',
-    'ローソン',
-    'lawson',
-    'ローソンストア100',
-    'lawsonstore100',
-    'ミニストップ',
-    'ministop',
-    'デイリーヤマザキ',
-    'dailyyamazaki',
-    'ニューデイズ',
-    'newdays',
-    'トモニー',
-    'tomony',
-    'キヨスク',
-    'キオスク',
-    'kiosk',
-  ]
-
-  const restaurantKeywords = [
-    'マクドナルド',
-    'マック',
-    "mcdonald's",
-    'mcdonalds',
-  ]
-
+  const convenienceStoreKeywords = ['セブン-イレブン', 'セブンイレブン', '7-eleven', '7eleven', 'ファミリーマート', 'ファミマ', 'familymart', 'ローソン', 'lawson', 'ローソンストア100', 'lawsonstore100', 'ミニストップ', 'ministop', 'デイリーヤマザキ', 'dailyyamazaki', 'ニューデイズ', 'newdays', 'トモニー', 'tomony', 'キヨスク', 'キオスク', 'kiosk']
+  const restaurantKeywords = ['マクドナルド', 'マック', "mcdonald's", 'mcdonalds']
   let categoryName: string | null = null
 
-  if (
-    convenienceStoreKeywords.some((keyword) =>
-      normalized.includes(normalizeCategoryMerchantName(keyword))
-    )
-  ) {
-    categoryName = 'コンビニ'
-  }
-
-  if (
-    restaurantKeywords.some((keyword) =>
-      normalized.includes(normalizeCategoryMerchantName(keyword))
-    )
-  ) {
-    categoryName = '外食'
-  }
-
-  if (!categoryName) {
-    return uncategorizedId
-  }
+  if (convenienceStoreKeywords.some((keyword) => normalized.includes(normalizeCategoryMerchantName(keyword)))) categoryName = 'コンビニ'
+  if (restaurantKeywords.some((keyword) => normalized.includes(normalizeCategoryMerchantName(keyword)))) categoryName = '外食'
+  if (!categoryName) return uncategorizedId
 
   const { data, error } = await supabase
     .from('categories')
@@ -145,17 +70,11 @@ async function resolveCategoryId(
     .limit(1)
     .maybeSingle()
 
-  if (error) {
-    throw error
-  }
-
+  if (error) throw error
   return data?.id || uncategorizedId
 }
 
-async function isDuplicateBySourceId(
-  userId: string,
-  sourceId: string
-): Promise<boolean> {
+async function isDuplicateBySourceId(userId: string, sourceId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('transactions')
     .select('id')
@@ -169,27 +88,12 @@ async function isDuplicateBySourceId(
   return !!data
 }
 
-async function isDuplicateByDateAmountMerchant(input: {
-  userId: string
-  date: string
-  amount: number
-  merchantName: string
-}): Promise<boolean> {
-  // 111円未満の取引はCSV重複判定の対象外
-  if (input.amount < 111) {
-    return false
-  }
+async function isDuplicateByDateAmountMerchant(input: { userId: string; date: string; amount: number; merchantName: string }): Promise<boolean> {
+  if (input.amount < 111) return false
 
   const { data, error } = await supabase
     .from('transactions')
-    .select(`
-      id,
-      amount,
-      date,
-      merchants (
-        canonical_name
-      )
-    `)
+    .select('id, amount, date, merchants(canonical_name)')
     .eq('user_id', input.userId)
     .eq('date', input.date)
     .eq('amount', input.amount)
@@ -197,280 +101,135 @@ async function isDuplicateByDateAmountMerchant(input: {
   if (error) throw error
 
   const targetMerchantName = normalizeMerchantName(input.merchantName)
-
-  if (!targetMerchantName) {
-    return false
-  }
+  if (!targetMerchantName) return false
 
   return (data || []).some((row: any) => {
-    const existingMerchantName = normalizeMerchantName(
-      row.merchants?.canonical_name || ''
-    )
-
-    if (!existingMerchantName) {
-      return false
-    }
-
-    // 店舗名が部分一致していれば重複と判定する
-    return (
-      existingMerchantName.includes(targetMerchantName) ||
-      targetMerchantName.includes(existingMerchantName)
-    )
+    const existingMerchantName = normalizeMerchantName(row.merchants?.canonical_name || '')
+    return !!existingMerchantName && (existingMerchantName.includes(targetMerchantName) || targetMerchantName.includes(existingMerchantName))
   })
 }
 
-async function syncUser(connection: {
-  user_id: string
-  refresh_token: string
-  last_synced_at: string | null
+async function insertSyncItem(input: {
+  userId: string
+  importHistoryId: string
+  message: any
+  result: 'imported' | 'duplicate' | 'failed'
+  merchantName?: string | null
+  date?: string | null
+  amount?: number | null
+  errorMessage?: string | null
 }) {
-  const userId = connection.user_id
+  const { error } = await supabase.from('gmail_sync_items').insert({
+    user_id: input.userId,
+    import_history_id: input.importHistoryId,
+    source_id: input.message.id || null,
+    message_subject: input.message.subject || null,
+    message_from: input.message.from || null,
+    merchant_name: input.merchantName || null,
+    transaction_date: input.date || null,
+    amount: input.amount ?? null,
+    result: input.result,
+    error_message: input.errorMessage || null,
+  })
 
+  if (error) console.error('[gmail-sync] 詳細結果保存失敗:', error)
+}
+
+async function syncUser(connection: { user_id: string; refresh_token: string; last_synced_at: string | null }) {
+  const userId = connection.user_id
   let accessToken: string
 
   try {
     const refreshed = await refreshAccessToken(connection.refresh_token)
     accessToken = refreshed.accessToken
-
-    await supabase
-      .from('gmail_connections')
-      .update({
-        access_token: refreshed.accessToken,
-        token_expires_at: refreshed.expiresAt.toISOString(),
-        status: 'active',
-      })
-      .eq('user_id', userId)
+    await supabase.from('gmail_connections').update({ access_token: refreshed.accessToken, token_expires_at: refreshed.expiresAt.toISOString(), status: 'active' }).eq('user_id', userId)
   } catch (e) {
-    // refresh_tokenが失効している場合はexpiredにして次回以降スキップする
-    await supabase
-      .from('gmail_connections')
-      .update({
-        status: 'expired',
-      })
-      .eq('user_id', userId)
-
+    await supabase.from('gmail_connections').update({ status: 'expired' }).eq('user_id', userId)
     console.error(`[gmail-sync] user=${userId} refresh_token失効:`, e)
     return
   }
 
-  // 前回同期日時の前日から検索する。
-  // 未同期の場合は3日前から検索する。
-  // 多少重複して取得しても、source_idおよび
-  // 日付・金額・店舗名の重複チェックで安全に処理する。
-  const since = connection.last_synced_at
-    ? new Date(
-        new Date(connection.last_synced_at).getTime() -
-          24 * 60 * 60 * 1000
-      )
-    : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+  const since = connection.last_synced_at ? new Date(new Date(connection.last_synced_at).getTime() - 24 * 60 * 60 * 1000) : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+  const messages = await fetchMessagesSince(accessToken, formatGmailDate(since))
 
-  const messages = await fetchMessagesSince(
-    accessToken,
-    formatGmailDate(since)
-  )
-
-  const { data: uncategorized, error: categoryError } = await supabase
-    .from('categories')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('name', '未分類')
-    .limit(1)
-    .maybeSingle()
-
-  if (categoryError) {
-    throw categoryError
-  }
+  const { data: uncategorized, error: categoryError } = await supabase.from('categories').select('id').eq('user_id', userId).eq('name', '未分類').limit(1).maybeSingle()
+  if (categoryError) throw categoryError
 
   let importedCount = 0
   let duplicateCount = 0
   let failedCount = 0
+  const detailRows: Array<Record<string, unknown>> = []
 
   for (const message of messages) {
-  console.log(
-    `[gmail-sync] message id=${message.id} from=${message.from} subject=${message.subject}`
-  )
+    console.log(`[gmail-sync] message id=${message.id} from=${message.from} subject=${message.subject}`)
+    const parsed = parseMessage(message)
 
-  console.log(
-    `[gmail-sync] body=${message.body.slice(0, 1000)}`
-  )
-
-  const parsed = parseMessage(message)
-
-if (!parsed) {
-  console.log(
-    `[gmail-sync] parse skipped id=${message.id} from=${message.from}`
-  )
-  continue
-}
-
-console.log(
-  `[gmail-sync] parsed date=${parsed.date} amount=${parsed.amount} merchant=${parsed.merchant} source=${parsed.sourceId}`
-)
-    
+    if (!parsed) {
+      failedCount++
+      detailRows.push({ user_id: userId, source_id: message.id || null, message_subject: message.subject || null, message_from: message.from || null, result: 'failed', error_message: 'メールを取引として解析できませんでした' })
+      continue
+    }
 
     try {
-      // Gmailメール自体の重複チェック
-      const duplicateBySourceId = await isDuplicateBySourceId(
-        userId,
-        parsed.sourceId
-      )
-
-      if (duplicateBySourceId) {
+      if (await isDuplicateBySourceId(userId, parsed.sourceId)) {
         duplicateCount++
-
-        console.log(
-          `[gmail-sync] source_id重複スキップ user=${userId} source_id=${parsed.sourceId}`
-        )
-
+        detailRows.push({ user_id: userId, source_id: parsed.sourceId, message_subject: message.subject || null, message_from: message.from || null, merchant_name: parsed.merchant, transaction_date: parsed.date, amount: parsed.amount, result: 'duplicate', error_message: '同じGmailメールは登録済みです' })
         continue
       }
 
-      // 既存のCSV・手入力データとの重複チェック
-      // 111円以上の場合のみ、同日・同額・店舗名部分一致で判定する
-      const duplicateByTransaction = await isDuplicateByDateAmountMerchant({
-        userId,
-        date: parsed.date,
-        amount: parsed.amount,
-        merchantName: parsed.merchant,
-      })
-
-      if (duplicateByTransaction) {
+      if (await isDuplicateByDateAmountMerchant({ userId, date: parsed.date, amount: parsed.amount, merchantName: parsed.merchant })) {
         duplicateCount++
-
-        console.log(
-          `[gmail-sync] 既存取引重複スキップ user=${userId} date=${parsed.date} amount=${parsed.amount} merchant=${parsed.merchant}`
-        )
-
+        detailRows.push({ user_id: userId, source_id: parsed.sourceId, message_subject: message.subject || null, message_from: message.from || null, merchant_name: parsed.merchant, transaction_date: parsed.date, amount: parsed.amount, result: 'duplicate', error_message: '同日・同額・同店舗の取引が登録済みです' })
         continue
       }
 
-      const merchantId = await resolveMerchantId(
-        userId,
-        parsed.merchant
-      )
-
-      const categoryId = await resolveCategoryId(
-        userId,
-        parsed.merchant,
-        uncategorized?.id || null
-      )
-
-      const { error: insertError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          date: parsed.date,
-          time: parsed.time,
-          amount: parsed.amount,
-          type: 'expense',
-          merchant_id: merchantId,
-          category_id: categoryId,
-          source: 'gmail',
-          source_id: parsed.sourceId,
-          source_detail: parsed.sourceDetail,
-          confidence: 'medium',
-          needs_review: false,
-        })
-
-      if (insertError) {
-        throw insertError
-      }
+      const merchantId = await resolveMerchantId(userId, parsed.merchant)
+      const categoryId = await resolveCategoryId(userId, parsed.merchant, uncategorized?.id || null)
+      const { error: insertError } = await supabase.from('transactions').insert({ user_id: userId, date: parsed.date, time: parsed.time, amount: parsed.amount, type: 'expense', merchant_id: merchantId, category_id: categoryId, source: 'gmail', source_id: parsed.sourceId, source_detail: parsed.sourceDetail, confidence: 'medium', needs_review: false })
+      if (insertError) throw insertError
 
       importedCount++
+      detailRows.push({ user_id: userId, source_id: parsed.sourceId, message_subject: message.subject || null, message_from: message.from || null, merchant_name: parsed.merchant, transaction_date: parsed.date, amount: parsed.amount, result: 'imported' })
     } catch (e) {
       failedCount++
-
-      console.error(
-        `[gmail-sync] user=${userId} 登録失敗:`,
-        e
-      )
+      detailRows.push({ user_id: userId, source_id: parsed.sourceId, message_subject: message.subject || null, message_from: message.from || null, merchant_name: parsed.merchant, transaction_date: parsed.date, amount: parsed.amount, result: 'failed', error_message: e instanceof Error ? e.message : String(e) })
+      console.error(`[gmail-sync] user=${userId} 登録失敗:`, e)
     }
   }
 
-  if (
-    importedCount > 0 ||
-    duplicateCount > 0 ||
-    failedCount > 0
-  ) {
-    const { error: historyError } = await supabase
-      .from('import_history')
-      .insert({
-        user_id: userId,
-        source: 'gmail',
-        filename: 'gmail-sync',
-        service_name: 'Gmail自動連携',
-        imported_count: importedCount,
-        duplicate_count: duplicateCount,
-        failed_count: failedCount,
-      })
+  let importHistoryId: string | null = null
+  if (importedCount > 0 || duplicateCount > 0 || failedCount > 0) {
+    const { data: history, error: historyError } = await supabase.from('import_history').insert({ user_id: userId, source: 'gmail', filename: 'gmail-sync', service_name: 'Gmail自動連携', imported_count: importedCount, duplicate_count: duplicateCount, failed_count: failedCount }).select('id').single()
+    if (historyError) console.error(`[gmail-sync] user=${userId} 履歴保存失敗:`, historyError)
+    importHistoryId = history?.id || null
+  }
 
-    if (historyError) {
-      console.error(
-        `[gmail-sync] user=${userId} 履歴保存失敗:`,
-        historyError
-      )
-    }
+  if (importHistoryId && detailRows.length > 0) {
+    const { error: detailError } = await supabase.from('gmail_sync_items').insert(detailRows.map((row) => ({ ...row, import_history_id: importHistoryId })))
+    if (detailError) console.error(`[gmail-sync] user=${userId} 詳細一括保存失敗:`, detailError)
   }
 
   const now = new Date().toISOString()
+  const { error: connectionUpdateError } = await supabase.from('gmail_connections').update({ last_synced_at: now }).eq('user_id', userId)
+  if (connectionUpdateError) throw connectionUpdateError
 
-  const { error: connectionUpdateError } = await supabase
-    .from('gmail_connections')
-    .update({
-      last_synced_at: now,
-    })
-    .eq('user_id', userId)
+  const { error: syncStateError } = await supabase.from('gmail_sync_state').upsert({ user_id: userId, last_synced_at: now, updated_at: now })
+  if (syncStateError) throw syncStateError
 
-  if (connectionUpdateError) {
-    throw connectionUpdateError
-  }
-
-  const { error: syncStateError } = await supabase
-    .from('gmail_sync_state')
-    .upsert({
-      user_id: userId,
-      last_synced_at: now,
-      updated_at: now,
-    })
-
-  if (syncStateError) {
-    throw syncStateError
-  }
-
-  console.log(
-    `[gmail-sync] user=${userId} 登録:${importedCount} 重複:${duplicateCount} 失敗:${failedCount}`
-  )
+  console.log(`[gmail-sync] user=${userId} 登録:${importedCount} 重複:${duplicateCount} 失敗:${failedCount}`)
 }
 
 async function main() {
-  const { data: connections, error } = await supabase
-    .from('gmail_connections')
-    .select('user_id, refresh_token, last_synced_at')
-    .eq('status', 'active')
-
-  if (error) {
-    throw error
-  }
-
+  const { data: connections, error } = await supabase.from('gmail_connections').select('user_id, refresh_token, last_synced_at').eq('status', 'active')
+  if (error) throw error
   if (!connections || connections.length === 0) {
     console.log('[gmail-sync] 有効なGmail連携がありません')
     return
   }
-
-  for (const connection of connections) {
-    await syncUser(connection)
-  }
+  for (const connection of connections) await syncUser(connection)
 }
 
 main().catch((e) => {
   console.error('[gmail-sync] 致命的エラー:', e)
   process.exit(1)
 })
-
-function normalizeMerchantName(merchantName: string) {
-  return merchantName
-    .normalize('NFKC')
-    .replace(/[－‐‑‒–—―ー]/g, '-')
-    .replace(/[\s・]/g, '')
-    .toLowerCase()
-}
