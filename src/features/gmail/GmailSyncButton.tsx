@@ -13,10 +13,10 @@ export default function GmailSyncButton() {
 
     try {
       await runGmailSync()
-      setMessage('Gmail同期を開始しました。完了後に右上の更新ボタンを押してください。')
+      setMessage('Gmail更新を開始しました。完了後に右上の更新ボタンを押してください。')
     } catch (error) {
       console.error(error)
-      setMessage('Gmail同期の起動に失敗しました。')
+      setMessage('Gmail更新の起動に失敗しました。')
     } finally {
       setRunning(false)
     }
@@ -29,7 +29,7 @@ export default function GmailSyncButton() {
       </div>
       <p className="sub">Gmailの利用通知をGitHub Actionsで取り込みます。</p>
       <button className="primary" onClick={handleRun} disabled={running}>
-        {running ? 'Gmail同期を起動中...' : 'Gmailを今すぐ同期'}
+        {running ? 'Gmailを更新中...' : 'Gmailを更新'}
       </button>
       {message && <p className="sub" style={{ marginTop: 12 }}>{message}</p>}
     </section>
