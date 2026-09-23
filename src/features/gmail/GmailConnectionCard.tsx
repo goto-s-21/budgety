@@ -1,5 +1,11 @@
 import GmailSyncButton from './GmailSyncButton'
 
-export default function GmailConnectionCard() {
+interface Props {
+  userId: string
+}
+
+export default function GmailConnectionCard({ userId }: Props) {
+  void userId
+
   return <GmailSyncButton />
 }
