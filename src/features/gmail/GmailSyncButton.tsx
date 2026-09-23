@@ -9,13 +9,7 @@ import {
 } from './gmailHistory'
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return new Date(value).toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function formatAmount(value: number | null) {
@@ -38,54 +32,36 @@ export default function GmailSyncButton() {
   async function loadLatest() {
     const { data } = await supabase.auth.getUser()
     if (!data.user) return
-
     const latest = await fetchLatestGmailImportHistory(data.user.id)
     setHistory(latest)
     setItems(latest ? await fetchGmailSyncItems(latest.id) : [])
   }
 
   useEffect(() => {
-    let cancelled = false
-
     loadLatest().catch(console.error)
-    return () => {
-      cancelled = true
-      void cancelled
-    }
   }, [])
 
   async function handleRun() {
     if (running) return
-
     setRunning(true)
     setMessage('Gmailの取り込み処理を開始しています...')
-
     try {
       const { data } = await supabase.auth.getUser()
       if (!data.user) throw new Error('ログインが必要です')
-
       const previous = await fetchLatestGmailImportHistory(data.user.id)
       const startedAt = Date.now()
-
       await runGmailSync()
       setMessage('Gmailの取り込み処理を実行中です...')
-
       for (let i = 0; i < 12; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 5000))
         const latest = await fetchLatestGmailImportHistory(data.user.id)
-
-        if (
-          latest &&
-          latest.id !== previous?.id &&
-          new Date(latest.created_at).getTime() >= startedAt
-        ) {
+        if (latest && latest.id !== previous?.id && new Date(latest.created_at).getTime() >= startedAt) {
           setHistory(latest)
           setItems(await fetchGmailSyncItems(latest.id))
           setMessage('Gmailの取り込みが完了しました。')
           return
         }
       }
-
       setMessage('Gmailの取り込みを開始しました。完了結果は後ほど表示されます。')
     } catch (error) {
       console.error(error)
@@ -103,49 +79,32 @@ export default function GmailSyncButton() {
 
   return (
     <section className="card">
-      <div className="section-head">
-        <h2>Gmail同期</h2>
-      </div>
+      <div className="section-head"><h2>Gmail同期</h2></div>
       <p className="sub">Gmailの利用通知をGitHub Actionsで取り込みます。</p>
-      <button className="primary" onClick={handleRun} disabled={running}>
-        {running ? 'Gmailを更新中...' : 'Gmailを更新'}
-      </button>
+      <button className="primary" onClick={handleRun} disabled={running}>{running ? 'Gmailを更新中...' : 'Gmailを更新'}</button>
       {message && <p className="sub" style={{ marginTop: 12 }}>{message}</p>}
       {history && (
         <div className="sub" style={{ marginTop: 12 }}>
           <div>最終実行：{formatDate(history.created_at)}</div>
-          <div style={{ marginTop: 4 }}>
-            登録 {history.imported_count}　重複 {history.duplicate_count}　失敗 {history.failed_count}
-          </div>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => setExpanded((value) => !value)}
-            style={{ marginTop: 8 }}
-          >
-            {expanded ? '詳細を隠す' : '詳細を見る'}
-          </button>
+          <div style={{ marginTop: 4 }}>登録 {history.imported_count}　重複 {history.duplicate_count}　失敗 {history.failed_count}</div>
+          <button className="text-button" type="button" onClick={() => setExpanded((value) => !value)} style={{ marginTop: 8 }}>{expanded ? '詳細を隠す' : '詳細を見る'}</button>
           {expanded && (
             <div style={{ marginTop: 12 }}>
-              {(['imported', 'duplicate', 'failed'] as const).map((result) => (
-                <div key={result} style={{ marginBottom: 12 }}>
-                  <div style={{ fontWeight: 600 }}>
-                    {result === 'imported' ? '登録' : result === 'duplicate' ? '重複' : '失敗'}
-                  </div>
-                  {grouped[result].length === 0 ? (
-                    <div>該当なし</div>
-                  ) : (
-                    grouped[result].map((item) => (
+              {items.length === 0 ? (
+                <div>この実行では詳細データが保存されていません。</div>
+              ) : (
+                (['imported', 'duplicate', 'failed'] as const).map((result) => (
+                  <div key={result} style={{ marginBottom: 12 }}>
+                    <div style={{ fontWeight: 600 }}>{result === 'imported' ? '登録' : result === 'duplicate' ? '重複' : '失敗'}</div>
+                    {grouped[result].length === 0 ? <div>該当なし</div> : grouped[result].map((item) => (
                       <div key={item.id} style={{ marginTop: 4 }}>
                         <div>{itemLabel(item)}</div>
-                        {result === 'failed' && item.error_message && (
-                          <div style={{ color: 'var(--muted)' }}>{item.error_message}</div>
-                        )}
+                        {result === 'failed' && item.error_message && <div style={{ color: 'var(--muted)' }}>{item.error_message}</div>}
                       </div>
-                    ))
-                  )}
-                </div>
-              ))}
+                    ))}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

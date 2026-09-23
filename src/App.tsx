@@ -41,7 +41,6 @@ export default function App() {
         void loadData(data.session.user.id)
       }
     })
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
       if (newSession && !initialized.current) {
@@ -55,17 +54,12 @@ export default function App() {
         setSnapshots([])
       }
     })
-
     return () => listener.subscription.unsubscribe()
   }, [])
 
   async function loadData(userId: string) {
     await ensureDefaultCategories(userId)
-    const [cats, txs, snaps] = await Promise.all([
-      fetchCategories(userId),
-      fetchTransactions(userId),
-      fetchSnapshots(userId),
-    ])
+    const [cats, txs, snaps] = await Promise.all([fetchCategories(userId), fetchTransactions(userId), fetchSnapshots(userId)])
     setCategories(cats || [])
     setTransactions(txs || [])
     setSnapshots(snaps || [])
@@ -80,17 +74,16 @@ export default function App() {
   async function handleRefresh() {
     if (!session || refreshing) return
     setRefreshing(true)
+    const startedAt = Date.now()
     try {
-      const [cats, txs, snaps] = await Promise.all([
-        fetchCategories(session.user.id),
-        fetchTransactions(session.user.id),
-        fetchSnapshots(session.user.id),
-      ])
+      const [cats, txs, snaps] = await Promise.all([fetchCategories(session.user.id), fetchTransactions(session.user.id), fetchSnapshots(session.user.id)])
       setCategories(cats || [])
       setTransactions(txs || [])
       setSnapshots(snaps || [])
     } finally {
-      setRefreshing(false)
+      const elapsed = Date.now() - startedAt
+      const remaining = Math.max(0, 800 - elapsed)
+      window.setTimeout(() => setRefreshing(false), remaining)
     }
   }
 
@@ -99,149 +92,41 @@ export default function App() {
     await addReset(session.user.id, balance)
     setSnapshots(await fetchSnapshots(session.user.id))
   }
-
   async function handleAssetAdjust(delta: number) {
     if (!session) return
     await addAdjustment(session.user.id, delta)
     setSnapshots(await fetchSnapshots(session.user.id))
   }
-
-  async function signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({ provider: 'google' })
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  function changeView(v: ViewName) {
-    setView(v)
-    setPage(v)
-  }
-
-  function openAddNew() {
-    setEditingTx(null)
-    setAddOpen(true)
-  }
-
+  async function signInWithGoogle() { await supabase.auth.signInWithOAuth({ provider: 'google' }) }
+  async function signOut() { await supabase.auth.signOut() }
+  function changeView(v: ViewName) { setView(v); setPage(v) }
+  function openAddNew() { setEditingTx(null); setAddOpen(true) }
   function openEdit(tx: any) {
-    setEditingTx({
-      id: tx.id,
-      type: tx.type,
-      amount: tx.amount,
-      merchantName: tx.merchants?.canonical_name || '',
-      categoryId: tx.category_id || '',
-      date: tx.date,
-      memo: tx.memo,
-    })
+    setEditingTx({ id: tx.id, type: tx.type, amount: tx.amount, merchantName: tx.merchants?.canonical_name || '', categoryId: tx.category_id || '', date: tx.date, memo: tx.memo })
     setAddOpen(true)
   }
-
-  function closeSheet() {
-    setAddOpen(false)
-    setEditingTx(null)
-  }
-
-  async function handleSubmit(input: {
-    type: 'expense' | 'income'
-    amount: number
-    merchantName: string
-    categoryId: string
-    date: string
-    memo?: string
-  }) {
+  function closeSheet() { setAddOpen(false); setEditingTx(null) }
+  async function handleSubmit(input: { type: 'expense' | 'income'; amount: number; merchantName: string; categoryId: string; date: string; memo?: string }) {
     if (!session) return
-    if (editingTx) {
-      await updateTransaction({ id: editingTx.id, userId: session.user.id, ...input })
-    } else {
-      await addTransaction({ userId: session.user.id, ...input })
-    }
+    if (editingTx) await updateTransaction({ id: editingTx.id, userId: session.user.id, ...input })
+    else await addTransaction({ userId: session.user.id, ...input })
     await refreshTransactions()
   }
-
-  async function handleDeleteTransaction(id: string) {
-    await deleteTransaction(id)
-    await refreshTransactions()
-  }
+  async function handleDeleteTransaction(id: string) { await deleteTransaction(id); await refreshTransactions() }
 
   if (loading) return null
-
-  if (!session) {
-    return (
-      <div className="login-screen">
-        <div className="brand"><span>♥</span>Budgety</div>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-          支出をできるだけ自動で集める家計管理アプリ
-        </p>
-        <button className="google-btn" onClick={signInWithGoogle}>
-          Googleでログイン
-        </button>
-      </div>
-    )
-  }
+  if (!session) return <div className="login-screen"><div className="brand"><span>♥</span>Budgety</div><p style={{ color: 'var(--muted)', fontSize: 13 }}>支出をできるだけ自動で集める家計管理アプリ</p><button className="google-btn" onClick={signInWithGoogle}>Googleでログイン</button></div>
 
   return (
     <div className="app">
-      <header className="top">
-        <div className="brand"><span>♥</span>Budgety</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</span>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className={refreshing ? 'refresh-btn spinning' : 'refresh-btn'}
-            aria-label="更新"
-          >
-            <IconRefresh color="var(--muted)" />
-          </button>
-        </div>
-      </header>
-
-      {page === 'home' && (
-        <Home
-          transactions={transactions}
-          totalAssets={computeTotalAssets(snapshots, transactions)}
-          hasReset={snapshots.some((s) => s.type === 'reset')}
-          onSeeAnalysis={() => changeView('analysis')}
-          onSeeHistory={() => changeView('history')}
-          onAssetReset={handleAssetReset}
-          onAssetAdjust={handleAssetAdjust}
-        />
-      )}
+      <header className="top"><div className="brand"><span>♥</span>Budgety</div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</span><button onClick={handleRefresh} disabled={refreshing} className={refreshing ? 'refresh-btn spinning' : 'refresh-btn'} aria-label="更新"><IconRefresh color="var(--muted)" /></button></div></header>
+      {page === 'home' && <Home transactions={transactions} totalAssets={computeTotalAssets(snapshots, transactions)} hasReset={snapshots.some((s) => s.type === 'reset')} onSeeAnalysis={() => changeView('analysis')} onSeeHistory={() => changeView('history')} onAssetReset={handleAssetReset} onAssetAdjust={handleAssetAdjust} />}
       {page === 'analysis' && <Analysis transactions={transactions} />}
-      {page === 'history' && (
-        <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />
-      )}
-      {page === 'more' && (
-        <More
-          userId={session.user.id}
-          userEmail={session.user.email}
-          onSignOut={signOut}
-          onOpenImport={() => setPage('import')}
-        />
-      )}
-      {page === 'import' && (
-        <Import
-          userId={session.user.id}
-          categories={categories}
-          onDone={() => {
-            void refreshTransactions()
-            changeView('history')
-          }}
-          onBack={() => setPage('more')}
-        />
-      )}
-
+      {page === 'history' && <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />}
+      {page === 'more' && <More userId={session.user.id} userEmail={session.user.email} onSignOut={signOut} onOpenImport={() => setPage('import')} />}
+      {page === 'import' && <Import userId={session.user.id} categories={categories} onDone={() => { void refreshTransactions(); changeView('history') }} onBack={() => setPage('more')} />}
       {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
-
-      <AddSheet
-        open={addOpen}
-        categories={categories}
-        editing={editingTx}
-        onClose={closeSheet}
-        onSubmit={handleSubmit}
-        onDelete={handleDeleteTransaction}
-      />
+      <AddSheet open={addOpen} categories={categories} editing={editingTx} onClose={closeSheet} onSubmit={handleSubmit} onDelete={handleDeleteTransaction} />
     </div>
   )
 }
