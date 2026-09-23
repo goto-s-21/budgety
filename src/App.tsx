@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { fetchCategories } from './lib/categories'
-import { fetchTransactions } from './lib/transactions'
+import { fetchCategories, fetchTransactions } from './lib/data'
 import { IconRefresh } from './components/Icons'
 import GmailConnectionCard from './features/gmail/GmailConnectionCard'
 
@@ -25,10 +24,6 @@ export default function App() {
       setRefreshing(false)
     }
   }
-
-  useEffect(() => {
-    void handleRefresh()
-  }, [])
 
   return (
     <button
