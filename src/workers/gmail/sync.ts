@@ -25,43 +25,131 @@ function formatGmailDate(d: Date): string {
   return `${y}/${m}/${day}`
 }
 
-function normalizeMerchantName(value: string): string {
+function normalizeCategoryMerchantName(value: string): string {
   return value
     .normalize('NFKC')
+    .replace(/[－‐‑‒–—―ー]/g, '-')
+    .replace(/[\s・]/g, '')
     .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/[・･]/g, '')
-    .trim()
 }
 
 async function resolveMerchantId(
   userId: string,
   merchantName: string
-): Promise<string> {
-  const trimmed = merchantName.trim()
+): Promise<string | null> {
+  const normalizedName = normalizeMerchantName(merchantName)
 
-  const { data: existing, error: findError } = await supabase
+  if (!normalizedName) {
+    return null
+  }
+
+  const { data: merchants, error: selectError } = await supabase
     .from('merchants')
-    .select('id')
+    .select('id, canonical_name')
     .eq('user_id', userId)
-    .eq('canonical_name', trimmed)
-    .limit(1)
-    .maybeSingle()
 
-  if (findError) throw findError
-  if (existing) return existing.id
+  if (selectError) {
+    throw selectError
+  }
 
-  const { data: created, error } = await supabase
+  const existingMerchant = (merchants || []).find((merchant) =>
+    normalizeMerchantName(merchant.canonical_name || '') === normalizedName
+  )
+
+  if (existingMerchant) {
+    return existingMerchant.id
+  }
+
+  const { data: createdMerchant, error: insertError } = await supabase
     .from('merchants')
     .insert({
       user_id: userId,
-      canonical_name: trimmed,
+      canonical_name: merchantName,
     })
     .select('id')
     .single()
 
-  if (error) throw error
-  return created.id
+  if (insertError) {
+    throw insertError
+  }
+
+  return createdMerchant?.id || null
+}
+
+async function resolveCategoryId(
+  userId: string,
+  merchantName: string,
+  uncategorizedId: string | null
+): Promise<string | null> {
+  const normalized = normalizeCategoryMerchantName(merchantName)
+
+  const convenienceStoreKeywords = [
+    'セブン-イレブン',
+    'セブンイレブン',
+    '7-eleven',
+    '7eleven',
+    'ファミリーマート',
+    'ファミマ',
+    'familymart',
+    'ローソン',
+    'lawson',
+    'ローソンストア100',
+    'lawsonstore100',
+    'ミニストップ',
+    'ministop',
+    'デイリーヤマザキ',
+    'dailyyamazaki',
+    'ニューデイズ',
+    'newdays',
+    'トモニー',
+    'tomony',
+    'キヨスク',
+    'キオスク',
+    'kiosk',
+  ]
+
+  const restaurantKeywords = [
+    'マクドナルド',
+    'マック',
+    "mcdonald's",
+    'mcdonalds',
+  ]
+
+  let categoryName: string | null = null
+
+  if (
+    convenienceStoreKeywords.some((keyword) =>
+      normalized.includes(normalizeCategoryMerchantName(keyword))
+    )
+  ) {
+    categoryName = 'コンビニ'
+  }
+
+  if (
+    restaurantKeywords.some((keyword) =>
+      normalized.includes(normalizeCategoryMerchantName(keyword))
+    )
+  ) {
+    categoryName = '外食'
+  }
+
+  if (!categoryName) {
+    return uncategorizedId
+  }
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('name', categoryName)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data?.id || uncategorizedId
 }
 
 async function isDuplicateBySourceId(
@@ -261,6 +349,12 @@ console.log(
         parsed.merchant
       )
 
+      const categoryId = await resolveCategoryId(
+        userId,
+        parsed.merchant,
+        uncategorized?.id || null
+      )
+
       const { error: insertError } = await supabase
         .from('transactions')
         .insert({
@@ -270,7 +364,7 @@ console.log(
           amount: parsed.amount,
           type: 'expense',
           merchant_id: merchantId,
-          category_id: uncategorized?.id || null,
+          category_id: categoryId,
           source: 'gmail',
           source_id: parsed.sourceId,
           source_detail: parsed.sourceDetail,
@@ -372,3 +466,11 @@ main().catch((e) => {
   console.error('[gmail-sync] 致命的エラー:', e)
   process.exit(1)
 })
+
+function normalizeMerchantName(merchantName: string) {
+  return merchantName
+    .normalize('NFKC')
+    .replace(/[－‐‑‒–—―ー]/g, '-')
+    .replace(/[\s・]/g, '')
+    .toLowerCase()
+}
