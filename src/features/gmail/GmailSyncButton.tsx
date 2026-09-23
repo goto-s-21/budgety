@@ -13,10 +13,10 @@ export default function GmailSyncButton() {
 
     try {
       await runGmailSync()
-      setMessage('Gmail更新を開始しました。完了後に右上の更新ボタンを押してください。')
+      setMessage('Gmailの取り込み処理を開始しました。完了後、取引履歴をご確認ください。')
     } catch (error) {
       console.error(error)
-      setMessage('Gmail更新の起動に失敗しました。')
+      setMessage('Gmailの取り込み処理の起動に失敗しました。')
     } finally {
       setRunning(false)
     }
