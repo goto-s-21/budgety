@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { runGmailSync } from './runGmailSync'
 import {
+  fetchGmailSyncItems,
   fetchLatestGmailImportHistory,
   type GmailImportHistory,
+  type GmailSyncItem,
 } from './gmailHistory'
 
 function formatDate(value: string) {
@@ -16,22 +18,39 @@ function formatDate(value: string) {
   })
 }
 
+function formatAmount(value: number | null) {
+  return value === null ? '-' : `¥${value.toLocaleString('ja-JP')}`
+}
+
+function itemLabel(item: GmailSyncItem) {
+  const merchant = item.merchant_name || item.message_subject || item.message_from || '内容不明'
+  const date = item.transaction_date || ''
+  return `${date ? `${date} ` : ''}${merchant} ${formatAmount(item.amount)}`
+}
+
 export default function GmailSyncButton() {
   const [running, setRunning] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [history, setHistory] = useState<GmailImportHistory | null>(null)
+  const [items, setItems] = useState<GmailSyncItem[]>([])
+  const [expanded, setExpanded] = useState(false)
+
+  async function loadLatest() {
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) return
+
+    const latest = await fetchLatestGmailImportHistory(data.user.id)
+    setHistory(latest)
+    setItems(latest ? await fetchGmailSyncItems(latest.id) : [])
+  }
 
   useEffect(() => {
     let cancelled = false
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return
-      const latest = await fetchLatestGmailImportHistory(data.user.id)
-      if (!cancelled) setHistory(latest)
-    }).catch(console.error)
-
+    loadLatest().catch(console.error)
     return () => {
       cancelled = true
+      void cancelled
     }
   }, [])
 
@@ -61,6 +80,7 @@ export default function GmailSyncButton() {
           new Date(latest.created_at).getTime() >= startedAt
         ) {
           setHistory(latest)
+          setItems(await fetchGmailSyncItems(latest.id))
           setMessage('Gmailの取り込みが完了しました。')
           return
         }
@@ -73,6 +93,12 @@ export default function GmailSyncButton() {
     } finally {
       setRunning(false)
     }
+  }
+
+  const grouped = {
+    imported: items.filter((item) => item.result === 'imported'),
+    duplicate: items.filter((item) => item.result === 'duplicate'),
+    failed: items.filter((item) => item.result === 'failed'),
   }
 
   return (
@@ -91,6 +117,37 @@ export default function GmailSyncButton() {
           <div style={{ marginTop: 4 }}>
             登録 {history.imported_count}　重複 {history.duplicate_count}　失敗 {history.failed_count}
           </div>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            style={{ marginTop: 8 }}
+          >
+            {expanded ? '詳細を隠す' : '詳細を見る'}
+          </button>
+          {expanded && (
+            <div style={{ marginTop: 12 }}>
+              {(['imported', 'duplicate', 'failed'] as const).map((result) => (
+                <div key={result} style={{ marginBottom: 12 }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {result === 'imported' ? '登録' : result === 'duplicate' ? '重複' : '失敗'}
+                  </div>
+                  {grouped[result].length === 0 ? (
+                    <div>該当なし</div>
+                  ) : (
+                    grouped[result].map((item) => (
+                      <div key={item.id} style={{ marginTop: 4 }}>
+                        <div>{itemLabel(item)}</div>
+                        {result === 'failed' && item.error_message && (
+                          <div style={{ color: 'var(--muted)' }}>{item.error_message}</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>
