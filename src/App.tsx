@@ -3,7 +3,6 @@ import { supabase } from './lib/supabase'
 import { fetchCategories } from './lib/categories'
 import { fetchTransactions } from './lib/transactions'
 import { IconRefresh } from './components/Icons'
-import GmailConnectionCard from './features/gmail/GmailConnectionCard'
 
 export default function App() {
   const [refreshing, setRefreshing] = useState(false)
