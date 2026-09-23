@@ -17,11 +17,7 @@ import More from './pages/More'
 import Import from './pages/Import'
 import './styles/theme.css'
 
-
-
 type PageName = ViewName | 'import'
-
-
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -36,39 +32,32 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false)
   const initialized = useRef(false)
 
-
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setLoading(false)
       if (data.session && !initialized.current) {
         initialized.current = true
-        loadData(data.session.user.id)
+        void loadData(data.session.user.id)
       }
     })
-
-
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
       if (newSession && !initialized.current) {
         initialized.current = true
-        loadData(newSession.user.id)
+        void loadData(newSession.user.id)
       }
       if (!newSession) {
         initialized.current = false
         setCategories([])
         setTransactions([])
+        setSnapshots([])
       }
     })
 
-
-
     return () => listener.subscription.unsubscribe()
   }, [])
-
-
 
   async function loadData(userId: string) {
     await ensureDefaultCategories(userId)
@@ -82,14 +71,11 @@ export default function App() {
     setSnapshots(snaps || [])
   }
 
-
-
   async function refreshTransactions() {
     if (!session) return
     const txs = await fetchTransactions(session.user.id)
     setTransactions(txs || [])
   }
-
 
   async function handleRefresh() {
     if (!session || refreshing) return
@@ -120,33 +106,23 @@ export default function App() {
     setSnapshots(await fetchSnapshots(session.user.id))
   }
 
-
-
   async function signInWithGoogle() {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }
 
-
-
   async function signOut() {
     await supabase.auth.signOut()
   }
-
-
 
   function changeView(v: ViewName) {
     setView(v)
     setPage(v)
   }
 
-
-
   function openAddNew() {
     setEditingTx(null)
     setAddOpen(true)
   }
-
-
 
   function openEdit(tx: any) {
     setEditingTx({
@@ -161,14 +137,10 @@ export default function App() {
     setAddOpen(true)
   }
 
-
-
   function closeSheet() {
     setAddOpen(false)
     setEditingTx(null)
   }
-
-
 
   async function handleSubmit(input: {
     type: 'expense' | 'income'
@@ -187,18 +159,12 @@ export default function App() {
     await refreshTransactions()
   }
 
-
-
   async function handleDeleteTransaction(id: string) {
     await deleteTransaction(id)
     await refreshTransactions()
   }
 
-
-
   if (loading) return null
-
-
 
   if (!session) {
     return (
@@ -213,8 +179,6 @@ export default function App() {
       </div>
     )
   }
-
-
 
   return (
     <div className="app">
@@ -232,8 +196,6 @@ export default function App() {
           </button>
         </div>
       </header>
-
-
 
       {page === 'home' && (
         <Home
@@ -263,18 +225,14 @@ export default function App() {
           userId={session.user.id}
           categories={categories}
           onDone={() => {
-            refreshTransactions()
+            void refreshTransactions()
             changeView('history')
           }}
           onBack={() => setPage('more')}
         />
       )}
 
-
-
       {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
-
-
 
       <AddSheet
         open={addOpen}
