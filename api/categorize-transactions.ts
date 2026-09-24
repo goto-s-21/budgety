@@ -44,12 +44,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'items is required' })
   }
 
-  const apiKey = (globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> }
-  }).process?.env?.GEMINI_API_KEY
+  // 1リクエストあたりの件数を制限（トークン超過とAPI乱用の抑止）。
+  // クライアントはBATCH_SIZE(40)ずつ送るため通常の利用では掛からない。
+  if (items.length > 100) {
+    return res.status(400).json({ error: 'too many items (max 100 per request)' })
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured' })
   }
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash'
 
   const prompt = `あなたは家計簿アプリのカテゴリー分類アシスタントです。
 以下の取引リストそれぞれに対して、最も適切なカテゴリーを次の中から1つ選んでください。
@@ -71,7 +76,7 @@ ${items.map((i) => `${i.index}: ${i.merchant} / ${i.amount}円`).join('\n')}
 
   try {
     const response = await callGeminiWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
       JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' },
@@ -91,6 +96,10 @@ ${items.map((i) => `${i.index}: ${i.merchant} / ${i.amount}円`).join('\n')}
       results = JSON.parse(text)
     } catch {
       return res.status(502).json({ error: 'Failed to parse AI response', raw: text })
+    }
+
+    if (!Array.isArray(results)) {
+      return res.status(502).json({ error: 'Unexpected AI response shape', raw: text })
     }
 
     const validCategories = new Set(CATEGORY_LIST)

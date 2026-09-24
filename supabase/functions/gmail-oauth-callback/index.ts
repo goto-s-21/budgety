@@ -83,7 +83,17 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
-  const tokenExpiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
+
+  // stateは平文base64で改ざん可能なため、userIdが実在するユーザーであることを確認する。
+  // （単一ユーザー運用では、自分以外のuserIdを詰めた偽装stateをここで弾ける）
+  const { data: userLookup, error: userLookupError } = await supabase.auth.admin.getUserById(decoded.userId)
+  if (userLookupError || !userLookup?.user) {
+    return Response.redirect(`${frontendUrl}?gmail_connect=error&reason=invalid_user`, 302)
+  }
+
+  // expires_in が欠落していても不正な日付にならないよう既定値(1時間)でガードする
+  const expiresInSec = typeof expires_in === 'number' && expires_in > 0 ? expires_in : 3600
+  const tokenExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString()
 
   const { error: upsertError } = await supabase
     .from('gmail_connections')
