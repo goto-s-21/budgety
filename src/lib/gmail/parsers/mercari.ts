@@ -5,17 +5,17 @@ function parseYen(value: string | undefined): number {
   return Number(value.replace(/[￥¥,\s]/g, '')) || 0
 }
 
-function getMessageDate(message: GmailMessage): string {
-  const date = new Date(Number(message.internalDate))
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-function getMessageTime(message: GmailMessage): string | null {
-  const date = new Date(Number(message.internalDate))
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+// internalDate(エポックms)を日本時間(JST)の日付・時刻に変換する。
+// 同期はGitHub Actions(UTC)上で動くため、サーバのTZに依存せず必ずJSTで記録する。
+function toJstDateTime(message: GmailMessage): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date(Number(message.internalDate)))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  const hour = get('hour') === '24' ? '00' : get('hour') // 環境によって深夜0時が'24'になるのを補正
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${hour}:${get('minute')}` }
 }
 
 function firstMatch(body: string, pattern: RegExp): string | undefined {
@@ -45,9 +45,11 @@ export const MercariParser: PaymentNotificationParser = {
 
     if (!itemPrice || amount <= 0) return null
 
+    const { date, time } = toJstDateTime(message)
+
     return {
-      date: getMessageDate(message),
-      time: getMessageTime(message),
+      date,
+      time,
       merchant: 'メルカリ',
       amount,
       paymentMethod: 'mercari',
