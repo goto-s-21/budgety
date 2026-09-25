@@ -31,6 +31,21 @@ export function buildStagedRows(rows: Record<string, string>[], mapping: ColumnM
 }
 
 
+// スクリーンショット抽出結果(日付・金額・店舗が直接得られる)をステージ行に変換する。
+// CSVのbuildStagedRowsと同じstatus判定・同じStagedRow形を使い、以降の重複判定・登録を共用する。
+export function buildStagedRowsFromExtracted(
+  items: { date: string | null; amount: number | null; merchant: string | null }[]
+): StagedRow[] {
+  return items.map((it, index) => {
+    const date = it.date ? parseDateFlexible(it.date) : null
+    const amount = typeof it.amount === 'number' && Number.isFinite(it.amount) ? it.amount : null
+    const merchantName = it.merchant?.trim() || null
+    const status: StagedRow['status'] = date && amount !== null && merchantName ? 'ok' : 'needs_review'
+    return { rowIndex: index, raw: {}, date, amount, merchantName, memo: null, status }
+  })
+}
+
+
 interface ExistingKey {
   date: string
   amount: number

@@ -5,11 +5,13 @@ import { guessColumnMapping, isMappingComplete, FIELD_LABELS } from '../lib/csv/
 import type { ColumnMapping, FieldKey } from '../lib/csv/columnMapper'
 import {
   buildStagedRows,
+  buildStagedRowsFromExtracted,
   markDuplicates,
   commitStagedRows,
   fetchImportHistory,
   fetchImportedTransactions,
 } from '../lib/csv/importTransactions'
+import { extractTransactionsFromImage } from '../lib/screenshot/parseScreenshot'
 import type {
   StagedRow,
   ImportResult,
@@ -46,6 +48,7 @@ function sourceLabel(source: string): string {
 
 export default function Import({ userId, categories, onDone, onBack }: Props) {
   const [step, setStep] = useState<Step>('select')
+  const [mode, setMode] = useState<'csv' | 'screenshot'>('csv')
   const [filename, setFilename] = useState('')
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Record<string, string>[]>([])
@@ -112,6 +115,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
+    setMode('csv')
     setFilename(file.name)
     try {
       const parsed = await parseCsvFile(file)
@@ -125,6 +129,34 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
       setStep('mapping')
     } catch {
       setError('このCSVの形式を自動判定できませんでした。列を指定してください。')
+    }
+  }
+
+
+  async function handleScreenshotSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setBusy(true)
+    setMode('screenshot')
+    setFilename(file.name)
+    try {
+      const extracted = await extractTransactionsFromImage(file)
+      if (extracted.length === 0) {
+        setError('スクリーンショットから取引を読み取れませんでした。別の画像でお試しください。')
+        return
+      }
+      const built = buildStagedRowsFromExtracted(extracted)
+      const withDuplicates = await markDuplicates(userId, built)
+      setStaged(withDuplicates)
+      setDefaultCategoryId(uncategorized?.id || categories[0]?.id || '')
+      setServiceName((s) => s || 'スクリーンショット')
+      setStep('preview')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'スクリーンショットの読み取りに失敗しました。')
+    } finally {
+      setBusy(false)
+      e.target.value = '' // 同じ画像を再選択できるようにする
     }
   }
 
@@ -214,6 +246,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
     setError('')
     setResult(null)
     setCategoryMap({})
+    setMode('csv')
     setStep('select')
   }
 
@@ -226,7 +259,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
   return (
     <>
       <div className="section-head">
-        <h2>CSVインポート</h2>
+        <h2>インポート</h2>
         <button onClick={onBack}>戻る</button>
       </div>
 
@@ -243,6 +276,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
       {step === 'select' && (
         <>
           <section className="card">
+            <h2 style={{ marginTop: 0 }}>CSVから取り込む</h2>
             <p className="sub" style={{ lineHeight: 1.8, marginBottom: 14 }}>
               楽天カード、PayPayなど、各サービスからダウンロードしたCSVファイルを選択してください。
               列の並びが異なるCSVでも、次の画面で確認・修正できます。
@@ -256,6 +290,24 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
               onChange={(e) => setServiceName(e.target.value)}
             />
             <input type="file" accept=".csv" onChange={handleFileSelect} />
+          </section>
+
+          <section className="card">
+            <h2 style={{ marginTop: 0 }}>スクショから取り込む</h2>
+            <p className="sub" style={{ lineHeight: 1.8, marginBottom: 14 }}>
+              決済アプリ・銀行アプリ・カード明細・レシートなどのスクリーンショットを選ぶと、
+              AIが日付・金額・店舗を読み取ります。次の画面で内容を確認・修正してから登録できます。
+              重複はCSVと同じく自動でスキップされます。
+            </p>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              onChange={handleScreenshotSelect}
+            />
+            {busy && mode === 'screenshot' && (
+              <p className="sub" style={{ marginTop: 10 }}>画像を読み取っています...</p>
+            )}
           </section>
 
           <section className="card">
@@ -430,9 +482,15 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
           <button className="primary" disabled={busy} onClick={handleCommit}>
             {busy ? '登録中...' : `${okCount + reviewCount}件を登録する`}
           </button>
-          <button className="secondary" onClick={() => setStep('mapping')}>
-            列の対応をやり直す
-          </button>
+          {mode === 'csv' ? (
+            <button className="secondary" onClick={() => setStep('mapping')}>
+              列の対応をやり直す
+            </button>
+          ) : (
+            <button className="secondary" onClick={handleImportAgain}>
+              別のスクショを選ぶ
+            </button>
+          )}
         </>
       )}
 
@@ -450,7 +508,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
             履歴を確認する
           </button>
           <button className="secondary" onClick={handleImportAgain}>
-            続けて別のCSVを取り込む
+            続けて取り込む
           </button>
         </section>
       )}

@@ -26,8 +26,8 @@ export default function More({ userId, userEmail, onSignOut, onOpenImport }: Pro
         <button className="spend-row" style={{ width: '100%', textAlign: 'left', background: 'none' }} onClick={onOpenImport}>
           <div className="icon">📥</div>
           <div className="grow">
-            <div className="name">CSVインポート</div>
-            <div className="sub">過去データの取り込み</div>
+            <div className="name">インポート</div>
+            <div className="sub">CSV・スクショから取り込み</div>
           </div>
           <span>›</span>
         </button>
