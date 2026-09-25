@@ -61,6 +61,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [isCategorizing, setIsCategorizing] = useState(false)
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({})
+  const [dupDecisions, setDupDecisions] = useState<Record<number, 'skip' | 'register'>>({})
   const [history, setHistory] = useState<ImportHistoryRow[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [showHistory, setShowHistory] = useState(false)
@@ -149,6 +150,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
       const built = buildStagedRowsFromExtracted(extracted)
       const withDuplicates = await markDuplicates(userId, built)
       setStaged(withDuplicates)
+      setDupDecisions({})
       setDefaultCategoryId(uncategorized?.id || categories[0]?.id || '')
       setServiceName((s) => s || 'スクリーンショット')
       setStep('preview')
@@ -173,6 +175,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
       const built = buildStagedRows(rows, mapping)
       const withDuplicates = await markDuplicates(userId, built)
       setStaged(withDuplicates)
+      setDupDecisions({})
       setDefaultCategoryId(uncategorized?.id || categories[0]?.id || '')
       setStep('preview')
     } catch {
@@ -193,7 +196,8 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
         defaultCategoryId,
         serviceName || 'unknown',
         filename,
-        categoryMap
+        categoryMap,
+        dupDecisions
       )
       setResult(res)
       setStep('done')
@@ -246,6 +250,7 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
     setError('')
     setResult(null)
     setCategoryMap({})
+    setDupDecisions({})
     setMode('csv')
     setStep('select')
   }
@@ -254,6 +259,13 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
   const okCount = staged.filter((r) => r.status === 'ok').length
   const reviewCount = staged.filter((r) => r.status === 'needs_review').length
   const dupCount = staged.filter((r) => r.status === 'duplicate').length
+  const possibleDupCount = staged.filter((r) => r.status === 'possible_duplicate').length
+  const dupRegisterCount = staged.filter(
+    (r) =>
+      (r.status === 'duplicate' || r.status === 'possible_duplicate') &&
+      dupDecisions[r.rowIndex] === 'register'
+  ).length
+  const registerCount = okCount + reviewCount + dupRegisterCount
 
 
   return (
@@ -429,8 +441,15 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
             <div className="insight">
               <strong>読み込み結果</strong>
               <p>
-                登録可能：{okCount}件 ・ 確認が必要：{reviewCount}件 ・ 重複の可能性：{dupCount}件
+                登録可能：{okCount}件 ・ 確認が必要：{reviewCount}件 ・ 重複：{dupCount}件 ・
+                似た取引：{possibleDupCount}件
               </p>
+              {(dupCount > 0 || possibleDupCount > 0) && (
+                <p style={{ marginTop: 6 }}>
+                  既存と重複・似ている取引は既定でスキップします。登録したい場合は各行の
+                  「重複でも登録する」にチェックしてください。
+                </p>
+              )}
             </div>
             <button
               className="secondary"
@@ -447,40 +466,77 @@ export default function Import({ userId, categories, onDone, onBack }: Props) {
 
 
           <section className="card">
-            {staged.map((r) => (
-              <div className="tx" key={r.rowIndex}>
-                <div className="grow">
-                  <div className="name">{r.merchantName || '(店舗不明)'}</div>
-                  <div className="sub">
-                    {r.date || '(日付不明)'} ・{' '}
-                    {r.status === 'duplicate'
-                      ? '重複の可能性があります'
-                      : r.status === 'needs_review'
-                        ? '確認が必要です'
-                        : '登録されます'}
+            {staged.map((r) => {
+              const isDupLike = r.status === 'duplicate' || r.status === 'possible_duplicate'
+              const willRegister = !isDupLike || dupDecisions[r.rowIndex] === 'register'
+              return (
+                <div
+                  className="tx"
+                  key={r.rowIndex}
+                  style={isDupLike && !willRegister ? { opacity: 0.55 } : undefined}
+                >
+                  <div className="grow">
+                    <div className="name">{r.merchantName || '(店舗不明)'}</div>
+                    <div className="sub">
+                      {r.date || '(日付不明)'} ・{' '}
+                      {r.status === 'duplicate'
+                        ? '同じ取引が既に登録済み'
+                        : r.status === 'possible_duplicate'
+                          ? '似た取引が既にあります'
+                          : r.status === 'needs_review'
+                            ? '確認が必要です'
+                            : '登録されます'}
+                    </div>
+                    {isDupLike && r.existingMatch && (
+                      <div className="sub" style={{ color: 'var(--primary)' }}>
+                        既存：{r.existingMatch.merchantName || '(店舗不明)'}（{r.existingMatch.date}
+                        {' ・ '}
+                        {yen(r.existingMatch.amount)}）
+                      </div>
+                    )}
+                    {isDupLike && (
+                      <label
+                        className="sub"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={willRegister}
+                          onChange={(e) =>
+                            setDupDecisions((m) => ({
+                              ...m,
+                              [r.rowIndex]: e.target.checked ? 'register' : 'skip',
+                            }))
+                          }
+                        />
+                        重複でも登録する
+                      </label>
+                    )}
+                    {willRegister && (
+                      <select
+                        value={categoryMap[r.rowIndex] || defaultCategoryId}
+                        onChange={(e) =>
+                          setCategoryMap((m) => ({ ...m, [r.rowIndex]: e.target.value }))
+                        }
+                        style={{ marginTop: 6 }}
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
-                  <select
-                    value={categoryMap[r.rowIndex] || defaultCategoryId}
-                    onChange={(e) =>
-                      setCategoryMap((m) => ({ ...m, [r.rowIndex]: e.target.value }))
-                    }
-                    style={{ marginTop: 6 }}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="amount">{r.amount !== null ? yen(r.amount) : '?'}</div>
                 </div>
-                <div className="amount">{r.amount !== null ? yen(r.amount) : '?'}</div>
-              </div>
-            ))}
+              )
+            })}
           </section>
 
 
           <button className="primary" disabled={busy} onClick={handleCommit}>
-            {busy ? '登録中...' : `${okCount + reviewCount}件を登録する`}
+            {busy ? '登録中...' : `${registerCount}件を登録する`}
           </button>
           {mode === 'csv' ? (
             <button className="secondary" onClick={() => setStep('mapping')}>

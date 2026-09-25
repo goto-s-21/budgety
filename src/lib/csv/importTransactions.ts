@@ -3,6 +3,12 @@ import type { ColumnMapping } from './columnMapper'
 import { parseAmount, parseDateFlexible } from './columnMapper'
 
 
+export interface ExistingMatch {
+  merchantName: string
+  date: string
+  amount: number
+}
+
 export interface StagedRow {
   rowIndex: number
   raw: Record<string, string>
@@ -10,8 +16,25 @@ export interface StagedRow {
   amount: number | null
   merchantName: string | null
   memo: string | null
-  status: 'ok' | 'needs_review' | 'duplicate'
+  // duplicate: 正規化して完全一致(確実な重複) / possible_duplicate: 日付・金額が同じで店舗名が似ている
+  status: 'ok' | 'needs_review' | 'duplicate' | 'possible_duplicate'
   duplicateReason?: string
+  existingMatch?: ExistingMatch
+}
+
+// 店舗名の表記ゆれ(全角半角・スペース・記号・大文字小文字)を吸収して比較用に正規化する。
+// Gmail同期側(workers/gmail/sync.ts)と同じ規則に揃え、アプリ全体で重複判定の挙動を統一する。
+function normalizeMerchantName(value: string): string {
+  return value.normalize('NFKC').replace(/[－‐‑‒–—―ー]/g, '-').replace(/[\s・]/g, '').toLowerCase()
+}
+
+// 正規化済みの店舗名どうしが「似ている」か。完全一致または一方が他方を含む(支店名の有無など)。
+// 誤検知を避けるため2文字未満の極端に短い名前は部分一致では拾わない。
+function isFuzzyMerchantMatch(a: string, b: string): boolean {
+  if (!a || !b) return false
+  if (a === b) return true
+  if (a.length < 2 || b.length < 2) return false
+  return a.includes(b) || b.includes(a)
 }
 
 
@@ -50,6 +73,7 @@ interface ExistingKey {
   date: string
   amount: number
   merchantName: string
+  normalized: string
 }
 
 
@@ -73,28 +97,48 @@ export async function markDuplicates(userId: string, staged: StagedRow[]): Promi
   if (error) throw error
 
 
-  const existingKeys: ExistingKey[] = (data || []).map((t: any) => ({
-    date: t.date,
-    amount: Number(t.amount),
-    merchantName: (t.merchants?.canonical_name || '').trim().toLowerCase(),
-  }))
+  const existingKeys: ExistingKey[] = (data || []).map((t: any) => {
+    const name = (t.merchants?.canonical_name || '').trim()
+    return { date: t.date, amount: Number(t.amount), merchantName: name, normalized: normalizeMerchantName(name) }
+  })
 
 
   return staged.map((row) => {
     if (row.status !== 'ok' || !row.date || row.amount === null || !row.merchantName) return row
 
 
-    const isDuplicate = existingKeys.some(
-      (k) =>
-        k.date === row.date &&
-        k.amount === row.amount &&
-        k.merchantName === row.merchantName!.trim().toLowerCase()
-    )
+    // 同じ日付・同じ金額の既存取引に絞り込む(表記ゆれは店舗名側で吸収する)
+    const sameDateAmount = existingKeys.filter((k) => k.date === row.date && k.amount === row.amount)
+    if (sameDateAmount.length === 0) return row
 
 
-    if (isDuplicate) {
-      return { ...row, status: 'duplicate', duplicateReason: '重複の可能性があります' }
+    const rowNorm = normalizeMerchantName(row.merchantName)
+
+
+    // 正規化して完全一致 → 確実な重複
+    const exact = sameDateAmount.find((k) => k.normalized && k.normalized === rowNorm)
+    if (exact) {
+      return {
+        ...row,
+        status: 'duplicate',
+        duplicateReason: '同じ取引が既に登録されています',
+        existingMatch: { merchantName: exact.merchantName, date: exact.date, amount: exact.amount },
+      }
     }
+
+
+    // 店舗名が部分一致 → 似た取引(登録するか確認する)
+    const near = sameDateAmount.find((k) => isFuzzyMerchantMatch(k.normalized, rowNorm))
+    if (near) {
+      return {
+        ...row,
+        status: 'possible_duplicate',
+        duplicateReason: '似た取引が既にあります',
+        existingMatch: { merchantName: near.merchantName, date: near.date, amount: near.amount },
+      }
+    }
+
+
     return row
   })
 }
@@ -142,7 +186,9 @@ export async function commitStagedRows(
   defaultCategoryId: string,
   serviceName: string,
   filename: string,
-  categoryMap: Record<number, string> = {}
+  categoryMap: Record<number, string> = {},
+  // 重複・似た取引の行を「登録する」に上書きする判断(rowIndex→'register')。既定はスキップ。
+  duplicateDecisions: Record<number, 'skip' | 'register'> = {}
 ): Promise<ImportResult> {
   const { data: historyRow, error: historyInsertError } = await supabase
     .from('import_history')
@@ -167,7 +213,8 @@ export async function commitStagedRows(
 
 
   for (const row of staged) {
-    if (row.status === 'duplicate') {
+    const isDuplicateLike = row.status === 'duplicate' || row.status === 'possible_duplicate'
+    if (isDuplicateLike && duplicateDecisions[row.rowIndex] !== 'register') {
       duplicateCount++
       continue
     }
