@@ -5,6 +5,8 @@ import { ensureDefaultCategories, fetchCategories } from './lib/categories'
 import { addTransaction, updateTransaction, deleteTransaction, fetchTransactions } from './lib/transactions'
 import { fetchSnapshots, addReset, addAdjustment, computeTotalAssets } from './lib/assets'
 import type { AssetSnapshot } from './lib/assets'
+import { fetchBudgets } from './lib/budgets'
+import type { Budget } from './lib/budgets'
 import { IconRefresh } from './components/Icons'
 import BottomNav from './components/BottomNav'
 import type { ViewName } from './components/BottomNav'
@@ -15,9 +17,10 @@ import Analysis from './pages/Analysis'
 import History from './pages/History'
 import More from './pages/More'
 import Import from './pages/Import'
+import BudgetSettings from './pages/BudgetSettings'
 import './styles/theme.css'
 
-type PageName = ViewName | 'import'
+type PageName = ViewName | 'import' | 'budget'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -29,6 +32,7 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [snapshots, setSnapshots] = useState<AssetSnapshot[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const initialized = useRef(false)
 
@@ -59,10 +63,11 @@ export default function App() {
 
   async function loadData(userId: string) {
     await ensureDefaultCategories(userId)
-    const [cats, txs, snaps] = await Promise.all([fetchCategories(userId), fetchTransactions(userId), fetchSnapshots(userId)])
+    const [cats, txs, snaps, buds] = await Promise.all([fetchCategories(userId), fetchTransactions(userId), fetchSnapshots(userId), fetchBudgets(userId)])
     setCategories(cats || [])
     setTransactions(txs || [])
     setSnapshots(snaps || [])
+    setBudgets(buds || [])
   }
 
   async function refreshTransactions() {
@@ -76,10 +81,11 @@ export default function App() {
     setRefreshing(true)
     const startedAt = Date.now()
     try {
-      const [cats, txs, snaps] = await Promise.all([fetchCategories(session.user.id), fetchTransactions(session.user.id), fetchSnapshots(session.user.id)])
+      const [cats, txs, snaps, buds] = await Promise.all([fetchCategories(session.user.id), fetchTransactions(session.user.id), fetchSnapshots(session.user.id), fetchBudgets(session.user.id)])
       setCategories(cats || [])
       setTransactions(txs || [])
       setSnapshots(snaps || [])
+      setBudgets(buds || [])
     } finally {
       const elapsed = Date.now() - startedAt
       const remaining = Math.max(0, 800 - elapsed)
@@ -121,10 +127,11 @@ export default function App() {
     <div className="app">
       <header className="top"><div className="brand"><span>♥</span>Budgety</div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="month">{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}</span><button onClick={handleRefresh} disabled={refreshing} className={refreshing ? 'refresh-btn spinning' : 'refresh-btn'} aria-label="更新"><IconRefresh color="var(--muted)" /></button></div></header>
       {page === 'home' && <Home transactions={transactions} totalAssets={computeTotalAssets(snapshots, transactions)} hasReset={snapshots.some((s) => s.type === 'reset')} onSeeAnalysis={() => changeView('analysis')} onSeeHistory={() => changeView('history')} onAssetReset={handleAssetReset} onAssetAdjust={handleAssetAdjust} />}
-      {page === 'analysis' && <Analysis transactions={transactions} />}
+      {page === 'analysis' && <Analysis transactions={transactions} budgets={budgets} categories={categories} />}
       {page === 'history' && <History transactions={transactions} onAdd={openAddNew} onEdit={openEdit} />}
-      {page === 'more' && <More userId={session.user.id} userEmail={session.user.email} onSignOut={signOut} onOpenImport={() => setPage('import')} />}
+      {page === 'more' && <More userId={session.user.id} userEmail={session.user.email} onSignOut={signOut} onOpenImport={() => setPage('import')} onOpenBudget={() => setPage('budget')} />}
       {page === 'import' && <Import userId={session.user.id} categories={categories} onDone={() => { void refreshTransactions(); changeView('history') }} onBack={() => setPage('more')} />}
+      {page === 'budget' && <BudgetSettings userId={session.user.id} categories={categories} budgets={budgets} onBack={() => setPage('more')} onChange={setBudgets} />}
       {page !== 'import' && <BottomNav active={view} onChange={changeView} onAdd={openAddNew} />}
       <AddSheet open={addOpen} categories={categories} editing={editingTx} onClose={closeSheet} onSubmit={handleSubmit} onDelete={handleDeleteTransaction} />
     </div>

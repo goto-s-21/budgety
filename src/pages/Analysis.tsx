@@ -15,12 +15,26 @@ interface TxRow {
   type: string
   amount: number
   date: string
+  category_id: string | null
   merchants: { canonical_name: string } | null
   categories: { name: string; icon: string | null } | null
 }
 
+interface BudgetRow {
+  category_id: string
+  amount: number
+}
+
+interface CategoryRow {
+  id: string
+  name: string
+  icon: string | null
+}
+
 interface Props {
   transactions: TxRow[]
+  budgets?: BudgetRow[]
+  categories?: CategoryRow[]
 }
 
 const PALETTE = [
@@ -36,7 +50,7 @@ function previousPeriod(unit: PeriodUnit, period: string): string {
   return navigatePeriod(unit, period, -1)
 }
 
-export default function Analysis({ transactions }: Props) {
+export default function Analysis({ transactions, budgets = [], categories = [] }: Props) {
   const [unit, setUnit] = useState<PeriodUnit>('month')
   const [period, setPeriod] = useState(thisMonth())
 
@@ -150,6 +164,37 @@ export default function Analysis({ transactions }: Props) {
           </div>
         ))}
       </section>
+
+      {unit === 'month' && budgets.length > 0 && (
+        <section className="card">
+          <div className="section-head"><h2>予算対比</h2></div>
+          {budgets.map((b) => {
+            const cat = categories.find((c) => c.id === b.category_id)
+            if (!cat) return null
+            const actual = now.filter((t) => t.category_id === b.category_id).reduce((s, t) => s + t.amount, 0)
+            const ratio = Math.min(actual / b.amount, 1)
+            const over = actual > b.amount
+            const diff = b.amount - actual
+            return (
+              <div key={b.category_id} style={{ padding: '11px 0', borderBottom: '1px solid #faedf1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="name">{cat.icon ? `${cat.icon} ` : ''}{cat.name}</div>
+                  <div style={{ fontSize: 13, color: over ? '#e03e5a' : 'var(--green)', fontWeight: 700 }}>
+                    {over ? `¥${(actual - b.amount).toLocaleString()} 超過` : `残り ¥${diff.toLocaleString()}`}
+                  </div>
+                </div>
+                <div className="bar-track" style={{ marginTop: 8 }}>
+                  <span className="bar-fill" style={{ width: `${ratio * 100}%`, background: over ? '#e03e5a' : 'var(--primary)', display: 'block', height: '100%', borderRadius: 99 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 12, color: 'var(--muted)' }}>
+                  <span>{yen(actual)}</span>
+                  <span>予算 {yen(b.amount)}</span>
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
 
       <section className="card">
         <div className="section-head"><h2>カテゴリ別 前{unitLabel(unit)}比較</h2></div>

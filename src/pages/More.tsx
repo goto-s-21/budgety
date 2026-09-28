@@ -5,9 +5,10 @@ interface Props {
   userEmail: string | undefined
   onSignOut: () => void
   onOpenImport: () => void
+  onOpenBudget: () => void
 }
 
-export default function More({ userId, userEmail, onSignOut, onOpenImport }: Props) {
+export default function More({ userId, userEmail, onSignOut, onOpenImport, onOpenBudget }: Props) {
   return (
     <>
       <div className="section-head">
@@ -15,14 +16,14 @@ export default function More({ userId, userEmail, onSignOut, onOpenImport }: Pro
       </div>
 
       <section className="card">
-        <div className="spend-row">
+        <button className="spend-row" style={{ width: '100%', textAlign: 'left', background: 'none' }} onClick={onOpenBudget}>
           <div className="icon">🎯</div>
           <div className="grow">
             <div className="name">予算設定</div>
             <div className="sub">カテゴリーごとの予算を管理</div>
           </div>
           <span>›</span>
-        </div>
+        </button>
         <button className="spend-row" style={{ width: '100%', textAlign: 'left', background: 'none' }} onClick={onOpenImport}>
           <div className="icon">📥</div>
           <div className="grow">
