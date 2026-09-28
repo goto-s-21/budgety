@@ -22,6 +22,7 @@ interface TxRow {
 
 interface BudgetRow {
   category_id: string
+  year_month: string
   amount: number
 }
 
@@ -165,10 +166,10 @@ export default function Analysis({ transactions, budgets = [], categories = [] }
         ))}
       </section>
 
-      {unit === 'month' && budgets.length > 0 && (
+      {unit === 'month' && budgets.filter((b) => b.year_month === period).length > 0 && (
         <section className="card">
           <div className="section-head"><h2>予算対比</h2></div>
-          {budgets.map((b) => {
+          {budgets.filter((b) => b.year_month === period).map((b) => {
             const cat = categories.find((c) => c.id === b.category_id)
             if (!cat) return null
             const actual = now.filter((t) => t.category_id === b.category_id).reduce((s, t) => s + t.amount, 0)
