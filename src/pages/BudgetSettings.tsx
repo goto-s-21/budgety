@@ -37,6 +37,7 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
   const [localAmounts, setLocalAmounts] = useState<Record<string, string>>({})
   const [savingCat, setSavingCat] = useState<Record<string, boolean>>({})
   const [copying, setCopying] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     const map: Record<string, string> = {}
@@ -49,6 +50,7 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
   async function handleBlur(catId: string) {
     const amount = parseInt((localAmounts[catId] || '0').replace(/,/g, ''), 10) || 0
     setSavingCat((s) => ({ ...s, [catId]: true }))
+    setSaveError(null)
     try {
       await upsertBudget(userId, catId, month, amount)
       const rest = budgets.filter((b) => !(b.category_id === catId && b.year_month === month))
@@ -56,6 +58,8 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
         ? [...rest, { id: '', category_id: catId, year_month: month, amount }]
         : rest
       onChange(next)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setSavingCat((s) => ({ ...s, [catId]: false }))
     }
@@ -104,6 +108,12 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
           <button onClick={() => setMonth(shiftMonth(month, 1))} style={{ fontSize: 22, color: 'var(--primary)', padding: '4px 10px' }}>›</button>
         </div>
       </section>
+
+      {saveError && (
+        <p style={{ color: '#e03e5a', fontSize: 13, margin: '0 0 8px', background: '#fff0f3', borderRadius: 8, padding: '8px 12px' }}>
+          エラー: {saveError}
+        </p>
+      )}
 
       <button
         onClick={handleCopyFromPrev}
