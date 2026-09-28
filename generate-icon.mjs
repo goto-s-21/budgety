@@ -4,9 +4,9 @@ const makeSvg = (size) => {
   const s = size / 48;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" fill="none">
   <g transform="scale(${s})">
-    <rect x="6"  y="20" width="9" height="22" rx="2" fill="#863bff"/>
-    <rect x="19" y="12" width="9" height="30" rx="2" fill="#863bff"/>
-    <rect x="32" y="28" width="9" height="14" rx="2" fill="#863bff"/>
+    <rect x="6"  y="20" width="9" height="22" rx="2" fill="#d85c82"/>
+    <rect x="19" y="12" width="9" height="30" rx="2" fill="#d85c82"/>
+    <rect x="32" y="28" width="9" height="14" rx="2" fill="#d85c82"/>
   </g>
 </svg>`;
 };
