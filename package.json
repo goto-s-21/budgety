@@ -24,6 +24,7 @@
     "@vercel/node": "^13.0.1",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "sharp": "^0.35.5",
     "supabase": "^2.117.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
