@@ -58,8 +58,8 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
         ? [...rest, { id: '', category_id: catId, year_month: month, amount }]
         : rest
       onChange(next)
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : '保存に失敗しました')
+    } catch (e: any) {
+      setSaveError(e?.message ?? e?.error_description ?? JSON.stringify(e))
     } finally {
       setSavingCat((s) => ({ ...s, [catId]: false }))
     }
