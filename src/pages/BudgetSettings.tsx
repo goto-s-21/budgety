@@ -103,9 +103,9 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
 
       <section className="card" style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => setMonth(shiftMonth(month, -1))} style={{ fontSize: 22, color: 'var(--primary)', padding: '4px 10px' }}>‹</button>
+          <button onClick={() => setMonth(shiftMonth(month, -1))} style={{ fontSize: 22, color: 'var(--primary)', padding: '4px 10px', background: '#fff' }}>‹</button>
           <span style={{ fontWeight: 700, fontSize: 15 }}>{formatMonth(month)}</span>
-          <button onClick={() => setMonth(shiftMonth(month, 1))} style={{ fontSize: 22, color: 'var(--primary)', padding: '4px 10px' }}>›</button>
+          <button onClick={() => setMonth(shiftMonth(month, 1))} style={{ fontSize: 22, color: 'var(--primary)', padding: '4px 10px', background: '#fff' }}>›</button>
         </div>
       </section>
 
