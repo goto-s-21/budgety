@@ -23,20 +23,17 @@ export async function upsertBudget(
   month: string,
   amount: number,
 ): Promise<void> {
-  if (amount <= 0) {
-    await supabase
-      .from('budgets')
-      .delete()
-      .eq('user_id', userId)
-      .eq('category_id', categoryId)
-      .eq('month', month)
-    return
-  }
+  await supabase
+    .from('budgets')
+    .delete()
+    .eq('user_id', userId)
+    .eq('category_id', categoryId)
+    .eq('month', month)
+
+  if (amount <= 0) return
+
   const { error } = await supabase
     .from('budgets')
-    .upsert(
-      { user_id: userId, category_id: categoryId, month, amount },
-      { onConflict: 'user_id,category_id,month' },
-    )
+    .insert({ user_id: userId, category_id: categoryId, month, amount })
   if (error) throw error
 }
