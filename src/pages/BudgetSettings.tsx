@@ -41,7 +41,7 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
 
   useEffect(() => {
     const map: Record<string, string> = {}
-    budgets.filter((b) => b.year_month === month).forEach((b) => {
+    budgets.filter((b) => b.month === month).forEach((b) => {
       map[b.category_id] = String(b.amount)
     })
     setLocalAmounts(map)
@@ -53,9 +53,9 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
     setSaveError(null)
     try {
       await upsertBudget(userId, catId, month, amount)
-      const rest = budgets.filter((b) => !(b.category_id === catId && b.year_month === month))
+      const rest = budgets.filter((b) => !(b.category_id === catId && b.month === month))
       const next: Budget[] = amount > 0
-        ? [...rest, { id: '', category_id: catId, year_month: month, amount }]
+        ? [...rest, { id: '', category_id: catId, month: month, amount }]
         : rest
       onChange(next)
     } catch (e: any) {
@@ -67,7 +67,7 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
 
   async function handleCopyFromPrev() {
     const prev = shiftMonth(month, -1)
-    const prevBudgets = budgets.filter((b) => b.year_month === prev)
+    const prevBudgets = budgets.filter((b) => b.month === prev)
     if (prevBudgets.length === 0) {
       alert(`${formatMonth(prev)}の予算が設定されていません`)
       return
@@ -75,9 +75,9 @@ export default function BudgetSettings({ userId, categories, budgets, onBack, on
     setCopying(true)
     try {
       await Promise.all(prevBudgets.map((b) => upsertBudget(userId, b.category_id, month, b.amount)))
-      const rest = budgets.filter((b) => b.year_month !== month)
-      const existing = budgets.filter((b) => b.year_month === month)
-      const copied = prevBudgets.map((b) => ({ ...b, year_month: month }))
+      const rest = budgets.filter((b) => b.month !== month)
+      const existing = budgets.filter((b) => b.month === month)
+      const copied = prevBudgets.map((b) => ({ ...b, month: month }))
       const merged = [
         ...existing.filter((e) => !copied.find((c) => c.category_id === e.category_id)),
         ...copied,

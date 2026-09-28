@@ -22,7 +22,7 @@ interface TxRow {
 
 interface BudgetRow {
   category_id: string
-  year_month: string
+  month: string
   amount: number
 }
 
@@ -167,7 +167,7 @@ export default function Analysis({ transactions, budgets = [], categories = [] }
       </section>
 
       {unit === 'month' && (() => {
-        const monthBudgets = budgets.filter((b) => b.year_month === period)
+        const monthBudgets = budgets.filter((b) => b.month === period)
         return (
           <section className="card">
             <div className="section-head"><h2>予算対比</h2></div>
