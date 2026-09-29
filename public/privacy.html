@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>プライバシーポリシー — budgety</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+      background: #fce7ef;
+      color: #454045;
+      margin: 0;
+      padding: 24px 20px 60px;
+    }
+    .wrap {
+      max-width: 680px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 24px;
+      padding: 32px 28px;
+      box-shadow: 0 12px 30px rgba(184,70,105,.09);
+    }
+    .brand {
+      font-size: 22px;
+      font-weight: 800;
+      color: #b84669;
+      margin-bottom: 4px;
+    }
+    h1 { font-size: 18px; margin: 0 0 24px; color: #454045; }
+    h2 { font-size: 15px; margin: 24px 0 8px; color: #b84669; }
+    p, li { font-size: 14px; line-height: 1.8; color: #454045; margin: 0 0 8px; }
+    ul { padding-left: 20px; margin: 0 0 8px; }
+    .updated { font-size: 12px; color: #a88f99; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">♥ budgety</div>
+    <p class="updated">最終更新日：2026年9月29日</p>
+    <h1>プライバシーポリシー</h1>
+
+    <p>budgety（以下「本アプリ」）は、個人の家計管理を目的としたウェブアプリケーションです。本ポリシーは、本アプリが収集・利用する情報について説明します。</p>
+
+    <h2>収集する情報</h2>
+    <ul>
+      <li>Googleアカウントの基本情報（メールアドレス・表示名）：ログイン認証のため</li>
+      <li>Gmail のメッセージ：クレジットカード・決済サービスの利用通知メールから支出情報を自動取得するため</li>
+      <li>手動で入力した収支データ（金額・日付・カテゴリ等）</li>
+    </ul>
+
+    <h2>情報の利用目的</h2>
+    <ul>
+      <li>本アプリの機能（家計管理・支出分析）の提供</li>
+      <li>Gmailから取得した情報は、利用者本人の支出データの自動記録のみに使用します</li>
+      <li>第三者への提供・広告利用は一切行いません</li>
+    </ul>
+
+    <h2>Googleユーザーデータの取り扱い</h2>
+    <p>本アプリがGoogleアカウントを通じて取得するデータは、利用者本人のサービス利用のみを目的として使用します。取得したGmailデータを第三者と共有・販売・広告目的で利用することはありません。本アプリのGoogleAPIの利用は、<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Google APIサービスのユーザーデータに関するポリシー</a>（Limited Use要件を含む）に準拠します。</p>
+
+    <h2>データの保存</h2>
+    <p>収支データはSupabase（PostgreSQL）に保存されます。Gmailのメッセージ本文はサーバーに保存せず、支出情報の抽出後に破棄します。</p>
+
+    <h2>データの削除</h2>
+    <p>アカウントおよび保存データの削除を希望する場合は、下記の連絡先までお問い合わせください。</p>
+
+    <h2>お問い合わせ</h2>
+    <p>satsuki.goto@eef.co.jp</p>
+  </div>
+</body>
+</html>
