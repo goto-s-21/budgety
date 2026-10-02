@@ -98,6 +98,7 @@ export default function History({ transactions, onAdd, onEdit }: Props) {
             </div>
             <div className="grow">
               <div className="name">{t.merchants?.canonical_name || '未設定'}</div>
+              {t.memo && <div className="sub" style={{ fontSize: 11 }}>{t.memo}</div>}
               <div className="sub">
                 {t.type === 'income' ? '収入' : (t.categories?.name || '未分類')} ・ {formatDate(t.date)}
               </div>

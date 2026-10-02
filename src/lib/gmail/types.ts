@@ -18,6 +18,7 @@ export interface ParsedTransaction {
   source: 'gmail'
   sourceId: string // Gmail message id (重複防止に使う)
   sourceDetail: string // サービス名(表示用)
+  memo?: string // 商品名など補足情報
 }
 
 export interface PaymentNotificationParser {

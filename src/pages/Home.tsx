@@ -7,6 +7,7 @@ interface TxRow {
   type: string
   amount: number
   date: string
+  memo: string | null
   merchants: { canonical_name: string } | null
   categories: { name: string; icon: string | null } | null
 }
@@ -146,6 +147,7 @@ export default function Home({ transactions, totalAssets, hasReset, onSeeAnalysi
             </div>
             <div className="grow">
               <div className="name">{t.merchants?.canonical_name || '未設定'}</div>
+              {t.memo && <div className="sub" style={{ fontSize: 11 }}>{t.memo}</div>}
               <div className="sub">{t.categories?.name || '未分類'}</div>
             </div>
             <div className="amount">-{yen(t.amount)}</div>

@@ -67,6 +67,7 @@ function parseMarketplacePurchase(message: GmailMessage): ParsedTransaction | nu
     source: 'gmail',
     sourceId: message.id,
     sourceDetail: `メルカリ${productId ? ` ${productId}` : ''}${productName ? ` ${productName}` : ''}`,
+    memo: productName || undefined,
   }
 }
 

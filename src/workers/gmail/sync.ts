@@ -118,7 +118,7 @@ async function syncUser(connection: { user_id: string; refresh_token: string; la
       }
       const merchantId = await resolveMerchantId(userId, parsed.merchant)
       const categoryId = await resolveCategoryId(userId, parsed.merchant, uncategorized?.id || null)
-      const { error: insertError } = await supabase.from('transactions').insert({ user_id: userId, date: parsed.date, time: parsed.time, amount: parsed.amount, type: 'expense', merchant_id: merchantId, category_id: categoryId, source: 'gmail', source_id: parsed.sourceId, source_detail: parsed.sourceDetail, confidence: 'medium', needs_review: false })
+      const { error: insertError } = await supabase.from('transactions').insert({ user_id: userId, date: parsed.date, time: parsed.time, amount: parsed.amount, type: 'expense', merchant_id: merchantId, category_id: categoryId, source: 'gmail', source_id: parsed.sourceId, source_detail: parsed.sourceDetail, memo: parsed.memo || null, confidence: 'medium', needs_review: false })
       if (insertError) throw insertError
       importedCount++
       detailRows.push({ user_id: userId, source_id: parsed.sourceId, message_subject: message.subject || null, message_from: message.from || null, merchant_name: parsed.merchant, transaction_date: parsed.date, amount: parsed.amount, result: 'imported' })
