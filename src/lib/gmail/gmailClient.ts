@@ -44,21 +44,47 @@ function decodeBase64Url(data: string): string {
   return Buffer.from(data, 'base64').toString('utf-8')
 }
 
-// メッセージのpayloadから本文テキストを再帰的に取り出す(multipart対応)
+// HTML メールのタグを除去してプレーンテキストに変換する。
+// <br>/<p>/<div>/<tr>/<li> は改行に変換し、他タグは削除する。
+function stripHtml(html: string): string {
+  return html
+    .replace(/<(br|p|div|tr|li)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// メッセージのpayloadから本文テキストを再帰的に取り出す(multipart対応)。
+// text/plain を優先し、HTML しかなければタグを剥がして返す。
 function extractBody(payload: any): string {
   if (!payload) return ''
 
+  // 単一パート: mimeType に応じて処理
   if (payload.body?.data) {
-    return decodeBase64Url(payload.body.data)
+    const raw = decodeBase64Url(payload.body.data)
+    return payload.mimeType === 'text/html' ? stripHtml(raw) : raw
   }
 
   if (payload.parts) {
+    // text/plain を最優先
     for (const part of payload.parts) {
       if (part.mimeType === 'text/plain' && part.body?.data) {
         return decodeBase64Url(part.body.data)
       }
     }
-    // text/plainが無ければ最初に見つかったパートを再帰的に探す
+    // text/html をフォールバック(タグ除去)
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/html' && part.body?.data) {
+        return stripHtml(decodeBase64Url(part.body.data))
+      }
+    }
+    // ネストされたマルチパートを再帰的に探す
     for (const part of payload.parts) {
       const nested = extractBody(part)
       if (nested) return nested
