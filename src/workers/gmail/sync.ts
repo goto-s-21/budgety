@@ -30,11 +30,13 @@ async function resolveMerchantId(userId: string, merchantName: string): Promise<
   const normalized = normalizeMerchantName(merchantName)
   const { data: existing, error: findError } = await supabase.from('merchants').select('id, canonical_name').eq('user_id', userId)
   if (findError) throw findError
-  const match = (existing || []).find((merchant: any) => {
-    const name = normalizeMerchantName(merchant.canonical_name || '')
-    return name && (name.includes(normalized) || normalized.includes(name))
-  })
-  if (match) return match.id
+
+  // 完全一致を最優先(あいまい一致では"メルカリ試奏音源..."が"メルカリ"にマッチしてしまうため)
+  const exactMatch = (existing || []).find((merchant: any) =>
+    normalizeMerchantName(merchant.canonical_name || '') === normalized
+  )
+  if (exactMatch) return exactMatch.id
+
   const { data, error } = await supabase.from('merchants').insert({ user_id: userId, canonical_name: merchantName }).select('id').single()
   if (error) throw error
   return data?.id || null
