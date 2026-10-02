@@ -30,15 +30,24 @@ function firstMatch(body: string, pattern: RegExp): string | undefined {
   return body.match(pattern)?.[1]?.trim()
 }
 
+// 本文から指定セクション(■商品情報 など)の内容だけを切り出す。
+// 推薦商品など他セクションの「商品名」を誤検出しないために使う。
+function extractSection(body: string, header: string): string {
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return body.match(new RegExp(`${escaped}([\\s\\S]*?)(?=■|$)`))?.[1] ?? ''
+}
+
 // メルカリのマーケット購入(商品代金・クーポン・ポイント利用の内訳を持つ)を取引に変換する。
 function parseMarketplacePurchase(message: GmailMessage): ParsedTransaction | null {
   const body = message.body
+  const productSection = extractSection(body, '■商品情報') || body
 
-  const productId = firstMatch(body, /商品ID\s*:\s*([^\r\n]+)/)
-  const productName = firstMatch(body, /商品名\s*:\s*([^\r\n]+)/)
-  const itemPriceText = firstMatch(body, /商品代金\s*:\s*([￥¥]?\s*[\d,]+)/)
-  const couponText = firstMatch(body, /クーポン\s*:\s*(?:利用なし|([￥¥]?\s*[\d,]+))/)
-  const pointsText = firstMatch(body, /ポイント利用\s*:\s*P\s*([\d,]+)/)
+  const productId = firstMatch(productSection, /商品ID\s*:\s*([^\r\n]+)/)
+  const productName = firstMatch(productSection, /商品名\s*:\s*([^\r\n]+)/)
+  const paymentSection = extractSection(body, '■支払い金額') || body
+  const itemPriceText = firstMatch(paymentSection, /商品代金\s*:\s*([￥¥]?\s*[\d,]+)/)
+  const couponText = firstMatch(paymentSection, /クーポン\s*:\s*(?:利用なし|([￥¥]?\s*[\d,]+))/)
+  const pointsText = firstMatch(paymentSection, /ポイント利用\s*:\s*P\s*([\d,]+)/)
 
   const itemPrice = parseYen(itemPriceText)
   const coupon = couponText && !/利用なし/.test(couponText) ? parseYen(couponText) : 0
